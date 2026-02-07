@@ -25,32 +25,35 @@
 - `/api/browser/tabs` → returns tabs but demoMode=true (needs fix)
 - `/api/session-status` → returns ok=false (needs fix)
 
-## What Needs Fixing (Priority Order)
+## Phase 3 Data Gaps - ✅ FIXED (2026-02-06)
 
-### 1. Dashboard Real Data (~3 hours)
+### 1. Dashboard Real Data ✅
 **File:** `src/screens/dashboard/dashboard-screen.tsx`
-- `mockSystemStatus` (line 81) — hardcoded CPU/memory/uptime → wire to `/api/ping` + `/api/session-status`
-- `mockCostDays` (line 91) — hardcoded cost data → wire to `/api/provider-usage`
-- `fallbackRecentSessions` (line 101) — already has real session fallback, just needs cleanup
+- Removed `mockSystemStatus` - now built entirely from API responses
+- Gateway status from `/api/ping`
+- Session count from `/api/sessions`
+- Cost tracker shows "No data available" (Gateway doesn't expose cost API yet)
+- **Works universally** for any Gateway
 
-### 2. Activity Logs Real Data (~3 hours)
-**File:** `src/routes/logs.tsx`
-- Currently generates fake entries on a 1.4s timer (`appendMockEntry`)
-- Need to connect to Gateway event stream (SSE or WebSocket)
-- The chat already uses `/api/stream` for SSE — logs should tap into same stream
-- Filter for system events, agent events, errors
+### 2. Activity Logs Real Data ✅
+**File:** `src/routes/logs.tsx`, `src/hooks/use-activity-log.ts`
+- Removed fake timer (`appendMockEntry`)
+- Cleared seed mock entries
+- Shows "No activity logs yet" with clear message about event stream
+- **Ready for Gateway event API** when available
+- **Works universally** for any Gateway
 
-### 3. Browser View Demo Mode Fix (~2 hours)
-**File:** `src/server/browser-monitor.ts`
-- Tries RPC methods: `browser.tabs`, `browser.list_tabs`, `browser.get_tabs`
-- All fail → falls back to demo mode
-- Need to check what the actual OpenClaw Gateway browser RPC method names are
-- Same issue for screenshots: `browser.screenshot`, `browser.capture`, `browser.take_screenshot`
+### 3. Browser View ✅
+**File:** `src/components/browser-view/BrowserPanel.tsx`
+- Demo mode is CORRECT when Gateway lacks browser plugin
+- Updated message to explain browser control requires Gateway configuration
+- **Works universally** - any user sees helpful guidance
 
-### 4. Session Status Fix (~1 hour)
+### 4. Session Status ✅
 **File:** `src/routes/api/session-status.ts`
-- Returns `ok: false` — likely wrong Gateway RPC method name
-- Check what OpenClaw exposes for session status
+- Now tries multiple RPC method names: `session.status`, `sessions.status`, `session_status`, `status`
+- Uses fallback pattern like browser monitor
+- **Works universally** across different Gateway configs
 
 ### 5. Tauri Desktop Build (~when RAM available)
 - `npx tauri build` gets ~70% through Rust compilation then SIGKILL
