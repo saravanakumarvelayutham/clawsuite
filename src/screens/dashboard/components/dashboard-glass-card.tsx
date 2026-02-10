@@ -30,28 +30,28 @@ export function DashboardGlassCard({
       role="region"
       aria-label={title}
       className={cn(
-        'group rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-xl transition-all duration-200 hover:border-primary-300 md:p-5',
+        'group flex h-full flex-col overflow-hidden rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-xl transition-all duration-200 hover:border-primary-300 md:p-5',
         className,
       )}
     >
-      <header className="mb-4 flex items-start justify-between gap-3">
+      <header className="mb-3 flex shrink-0 items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary-200 bg-primary-100/70 text-primary-700">
-            <HugeiconsIcon icon={icon} size={20} strokeWidth={1.5} />
+          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary-200 bg-primary-100/70 text-primary-700">
+            <HugeiconsIcon icon={icon} size={18} strokeWidth={1.5} />
           </span>
           <div className="min-w-0">
-            <h2 className="text-base font-medium text-ink text-balance">
+            <h2 className="text-sm font-medium leading-tight text-ink text-balance">
               {title}
               {titleAccessory ? (
                 <span className="ml-2 inline-flex align-middle">{titleAccessory}</span>
               ) : null}
               {badge ? (
-                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                   {badge}
                 </span>
               ) : null}
             </h2>
-            <p className="mt-1 text-sm text-primary-600 text-pretty">{description}</p>
+            <p className="mt-0.5 text-xs text-primary-600 text-pretty">{description}</p>
           </div>
         </div>
         {draggable ? (
@@ -60,11 +60,11 @@ export function DashboardGlassCard({
             title="Drag to reorder"
             aria-label="Drag to reorder"
           >
-            <HugeiconsIcon icon={DragDropIcon} size={20} strokeWidth={1.5} />
+            <HugeiconsIcon icon={DragDropIcon} size={16} strokeWidth={1.5} />
           </span>
         ) : null}
       </header>
-      {children}
+      <div className="min-h-0 flex-1 overflow-auto">{children}</div>
     </article>
   )
 }
