@@ -272,7 +272,19 @@ export function DashboardScreen() {
     <main className="min-h-screen bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
       <section className="mx-auto w-full max-w-[1600px]">
         <header className="mb-6 rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl md:mb-7 md:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Row 1: Brand left, controls right */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <OpenClawStudioIcon className="size-9 shrink-0 rounded-xl shadow-sm md:size-10" />
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold leading-tight text-ink md:text-2xl">
+                  OpenClaw <span className="font-medium text-primary-500">Studio</span>
+                </h1>
+                <p className="hidden text-xs text-primary-500 sm:block">
+                  Design, orchestrate, and monitor AI agent systems.
+                </p>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <HeaderAmbientStatus />
               <ThemeToggle />
@@ -305,19 +317,8 @@ export function DashboardScreen() {
               </button>
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-3">
-            <OpenClawStudioIcon className="size-10 rounded-xl shadow-sm md:size-12" />
-            <div>
-              <h1 className="text-2xl font-semibold text-ink text-balance md:text-3xl">
-                OpenClaw <span className="font-medium text-primary-500">Studio</span>
-              </h1>
-              <p className="mt-0.5 max-w-3xl text-sm text-primary-500 text-pretty">
-                Design, orchestrate, and monitor AI agent systems.
-              </p>
-            </div>
-          </div>
-          {/* Quick Actions — persistent in header, not draggable */}
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {/* Row 2: Quick Actions */}
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {quickActions.map((action) => (
               <button
                 key={action.id}
