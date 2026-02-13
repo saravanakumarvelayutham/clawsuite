@@ -102,9 +102,19 @@ export function OnboardingTour() {
       fontSize: 14,
     },
     buttonClose: {
-      width: 20,
-      height: 20,
+      width: 24,
+      height: 24,
       padding: 0,
+      top: 8,
+      right: 8,
+      opacity: 0.6,
+      transition: 'all 0.2s ease',
+    },
+    tooltipClose: {
+      width: 24,
+      height: 24,
+      top: 8,
+      right: 8,
     },
     spotlight: {
       borderRadius: 8,

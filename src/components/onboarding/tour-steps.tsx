@@ -6,8 +6,24 @@ export const tourSteps: Step[] = [
     target: 'body',
     placement: 'center',
     title: 'Welcome to ClawSuite! 👋',
-    content:
-      "Your AI-powered command center for managing agents, chats, files, and more. Let's take a quick tour!",
+    content: (
+      <div style={{ textAlign: 'center' }}>
+        <img 
+          src="/logo-final.svg" 
+          alt="ClawSuite" 
+          style={{ 
+            height: '48px', 
+            marginBottom: '16px',
+            display: 'block',
+            marginLeft: 'auto',
+            marginRight: 'auto'
+          }} 
+        />
+        <div style={{ textAlign: 'left' }}>
+          Your AI-powered command center for managing agents, chats, files, and more. Let&apos;s take a quick tour!
+        </div>
+      </div>
+    ),
     disableBeacon: true,
   },
   // Step 2: Sidebar
