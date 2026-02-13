@@ -130,10 +130,11 @@ export function ChatPanel() {
           />
           <motion.div
           initial={{ width: 0, opacity: 0 }}
-          animate={{ width: '100%', opacity: 1 }}
+          animate={{ width: 420, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{ duration: 0.2, ease: 'easeInOut' }}
-          className="absolute right-0 top-0 h-full border-l border-primary-200 bg-surface overflow-hidden flex flex-col z-20 shadow-xl min-[1200px]:relative min-[1200px]:shadow-none w-full max-w-[420px] max-[480px]:max-w-full"
+          className="absolute right-0 top-0 h-full min-w-0 border-l border-primary-200 bg-surface overflow-hidden flex flex-col z-20 shadow-xl min-[1200px]:relative min-[1200px]:shadow-none"
+          style={{ maxWidth: 420 }}
         >
           {/* Panel header */}
           <div className="flex items-center justify-between h-10 px-3 border-b border-primary-200 shrink-0">
@@ -227,7 +228,7 @@ export function ChatPanel() {
                       }}
                       className={`w-full text-left px-3 py-1.5 text-xs truncate transition-colors ${
                         s.friendlyId === activeFriendlyId
-                          ? 'bg-accent-500/10 text-accent-600'
+                          ? 'bg-orange-500/10 text-orange-600'
                           : 'text-primary-700 hover:bg-primary-100'
                       }`}
                     >
@@ -239,9 +240,9 @@ export function ChatPanel() {
             )}
           </AnimatePresence>
 
-          {/* Chat content — fill available panel width */}
-          <div className="flex-1 min-h-0 w-full overflow-hidden chat-panel-content" data-chat-panel-mounted="true">
-            <div className="h-full w-full overflow-hidden">
+          {/* Chat content — force width containment to panel width */}
+          <div className="flex-1 min-h-0 w-[420px] max-w-[420px] overflow-hidden chat-panel-content">
+            <div className="h-full w-full max-w-[420px] overflow-hidden">
               <ChatScreen
                 key={activeFriendlyId}
                 activeFriendlyId={activeFriendlyId}

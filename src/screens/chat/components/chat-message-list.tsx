@@ -133,39 +133,10 @@ function ChatMessageListComponent({
     const anchor = anchorRef.current
     if (!anchor) return
     const viewport = anchor.closest('[data-chat-scroll-viewport]') as HTMLElement | null
-    if (viewport && viewport.scrollHeight > 0) {
+    if (viewport) {
       viewport.scrollTo({ top: viewport.scrollHeight, behavior })
     }
   }, [])
-
-  // ResizeObserver to handle scroll when panel animates open (compact mode)
-  useEffect(() => {
-    const anchor = anchorRef.current
-    if (!anchor) return
-
-    const viewport = anchor.closest('[data-chat-scroll-viewport]') as HTMLElement | null
-    if (!viewport) return
-
-    // Check if we're in a chat panel (compact mode with animation)
-    const isInPanel = viewport.closest('[data-chat-panel-mounted]') !== null
-    if (!isInPanel) return
-
-    let lastWidth = 0
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const newWidth = entry.contentRect.width
-        // Trigger scroll when container gets meaningful width (panel animation complete)
-        if (lastWidth === 0 && newWidth > 100 && stickToBottomRef.current) {
-          // Use a small delay to ensure layout is fully settled
-          window.setTimeout(() => scrollToBottom('auto'), 50)
-        }
-        lastWidth = newWidth
-      }
-    })
-
-    resizeObserver.observe(viewport)
-    return () => resizeObserver.disconnect()
-  }, [scrollToBottom])
 
   // Filter out toolResult messages - they'll be displayed inside their associated tool calls
   const displayMessages = useMemo(() => {
