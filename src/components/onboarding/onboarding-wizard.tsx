@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect } from 'react'
+// initialize removed — store hydrates from localStorage at module load
 import { AnimatePresence, motion } from 'motion/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { ArrowLeft01Icon, ArrowRight01Icon, Cancel01Icon } from '@hugeicons/core-free-icons'
@@ -11,13 +12,8 @@ import { cn } from '@/lib/utils'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 
 export function OnboardingWizard() {
-  const { isOpen, currentStep, totalSteps, initialize, nextStep, prevStep, goToStep, complete, skip } =
+  const { isOpen, currentStep, totalSteps, nextStep, prevStep, goToStep, complete, skip } =
     useOnboardingStore()
-
-  // Initialize on mount
-  useEffect(() => {
-    initialize()
-  }, [initialize])
 
   const isFirstStep = currentStep === 0
   const isLastStep = currentStep === totalSteps - 1

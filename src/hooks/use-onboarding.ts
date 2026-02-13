@@ -21,16 +21,17 @@ type OnboardingState = {
   reset: () => void
 }
 
+// Check completion once at module load so the store never flickers open
+const isCompleted = typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEY) === 'true'
+
 export const useOnboardingStore = create<OnboardingState>((set, get) => ({
-  isOpen: false,
+  isOpen: !isCompleted,
   currentStep: 0,
   totalSteps: ONBOARDING_STEPS.length,
 
   initialize: () => {
-    const completed = localStorage.getItem(STORAGE_KEY)
-    if (!completed) {
-      set({ isOpen: true, currentStep: 0 })
-    }
+    // No-op: hydrated from localStorage at module load.
+    // Kept for API compat — remove callers over time.
   },
 
   nextStep: () => {

@@ -612,13 +612,15 @@ export function ChatScreen({
       streamFinish()
     }, 120_000)
 
+    // Map to gateway-expected field names:
+    // gateway wants: mimeType, fileName, content (base64 without data: prefix)
     const payloadAttachments = normalizedAttachments.map((attachment) => ({
       id: attachment.id,
-      name: attachment.name,
-      contentType: attachment.contentType,
+      fileName: attachment.name,
+      mimeType: attachment.contentType,
+      type: attachment.contentType?.startsWith('image/') ? 'image' : 'file',
+      content: attachment.dataUrl?.replace(/^data:[^;]+;base64,/, '') ?? '',
       size: attachment.size,
-      dataUrl: attachment.dataUrl,
-      previewUrl: attachment.previewUrl,
     }))
 
     fetch('/api/send', {
