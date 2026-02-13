@@ -5,7 +5,8 @@ type OnboardingState = {
   isOpen: boolean
   currentStep: number
   totalSteps: number
-  /** Check localStorage and open wizard if not completed */
+  _initialized: boolean
+  /** Check localStorage (client-only, runs once) and open wizard if not completed */
   initialize: () => void
   /** Go to next step */
   nextStep: () => void
@@ -21,17 +22,26 @@ type OnboardingState = {
   reset: () => void
 }
 
-// Check completion once at module load so the store never flickers open
-const isCompleted = typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEY) === 'true'
-
 export const useOnboardingStore = create<OnboardingState>((set, get) => ({
-  isOpen: !isCompleted,
+  // Start closed — initialize() opens it on client if not completed
+  isOpen: false,
   currentStep: 0,
   totalSteps: ONBOARDING_STEPS.length,
+  _initialized: false,
 
   initialize: () => {
-    // No-op: hydrated from localStorage at module load.
-    // Kept for API compat — remove callers over time.
+    // Only run once per app lifetime, only on client
+    if (get()._initialized) return
+    set({ _initialized: true })
+    if (typeof window === 'undefined') return
+    try {
+      const completed = localStorage.getItem(STORAGE_KEY) === 'true'
+      if (!completed) {
+        set({ isOpen: true, currentStep: 0 })
+      }
+    } catch {
+      // ignore localStorage errors (SSR, privacy mode, etc.)
+    }
   },
 
   nextStep: () => {
