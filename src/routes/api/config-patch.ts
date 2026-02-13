@@ -17,7 +17,6 @@ export const Route = createFileRoute('/api/config-patch')({
 
           const result = await gatewayRpc<{ ok: boolean; error?: string }>('config.patch', {
             raw,
-            reason,
           })
 
           return json({ ...result, ok: true })
