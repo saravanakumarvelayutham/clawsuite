@@ -314,7 +314,7 @@ export function UsageDetailsModal({
   }
 
   return (
-    <div className="flex max-h-[80vh] flex-col gap-4 p-5">
+    <div className="flex max-h-[80vh] flex-col gap-4 overflow-hidden p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <DialogTitle>Usage Overview</DialogTitle>
@@ -342,8 +342,9 @@ export function UsageDetailsModal({
         ))}
       </div>
 
+      <div className="flex-1 overflow-y-auto">
       {activeTab === 'session' ? (
-        <>
+        <div className="flex flex-col gap-4">
           {error ? (
             <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
               {error}
@@ -407,9 +408,9 @@ export function UsageDetailsModal({
             <div className="text-xs text-primary-500">Context usage: {Math.round(usage.contextPercent)}%</div>
             <Button size="sm" variant="outline" onClick={handleExport}>Export CSV</Button>
           </div>
-        </>
+        </div>
       ) : (
-        <>
+        <div className="flex flex-col gap-4">
           {providerError ? (
             <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
               {providerError}
@@ -514,8 +515,9 @@ export function UsageDetailsModal({
               })
             )}
           </div>
-        </>
+        </div>
       )}
+      </div>
     </div>
   )
 }
