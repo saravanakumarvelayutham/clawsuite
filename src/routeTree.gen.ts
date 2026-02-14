@@ -37,6 +37,7 @@ import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
+import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-provider'
 import { Route as ApiUsageRouteImport } from './routes/api/usage'
 import { Route as ApiUpdateCheckRouteImport } from './routes/api/update-check'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
@@ -234,6 +235,11 @@ const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
 const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
   id: '/api/workspace',
   path: '/api/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiValidateProviderRoute = ApiValidateProviderRouteImport.update({
+  id: '/api/validate-provider',
+  path: '/api/validate-provider',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiUsageRoute = ApiUsageRouteImport.update({
@@ -588,6 +594,7 @@ export interface FileRoutesByFullPath {
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/update-check': typeof ApiUpdateCheckRoute
   '/api/usage': typeof ApiUsageRoute
+  '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -675,6 +682,7 @@ export interface FileRoutesByTo {
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/update-check': typeof ApiUpdateCheckRoute
   '/api/usage': typeof ApiUsageRoute
+  '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -764,6 +772,7 @@ export interface FileRoutesById {
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/update-check': typeof ApiUpdateCheckRoute
   '/api/usage': typeof ApiUsageRoute
+  '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -854,6 +863,7 @@ export interface FileRouteTypes {
     | '/api/terminal-stream'
     | '/api/update-check'
     | '/api/usage'
+    | '/api/validate-provider'
     | '/api/workspace'
     | '/chat/$sessionKey'
     | '/settings/providers'
@@ -941,6 +951,7 @@ export interface FileRouteTypes {
     | '/api/terminal-stream'
     | '/api/update-check'
     | '/api/usage'
+    | '/api/validate-provider'
     | '/api/workspace'
     | '/chat/$sessionKey'
     | '/settings/providers'
@@ -1029,6 +1040,7 @@ export interface FileRouteTypes {
     | '/api/terminal-stream'
     | '/api/update-check'
     | '/api/usage'
+    | '/api/validate-provider'
     | '/api/workspace'
     | '/chat/$sessionKey'
     | '/settings/providers'
@@ -1118,6 +1130,7 @@ export interface RootRouteChildren {
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
   ApiUpdateCheckRoute: typeof ApiUpdateCheckRoute
   ApiUsageRoute: typeof ApiUsageRoute
+  ApiValidateProviderRoute: typeof ApiValidateProviderRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
@@ -1329,6 +1342,13 @@ declare module '@tanstack/react-router' {
       path: '/api/workspace'
       fullPath: '/api/workspace'
       preLoaderRoute: typeof ApiWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/validate-provider': {
+      id: '/api/validate-provider'
+      path: '/api/validate-provider'
+      fullPath: '/api/validate-provider'
+      preLoaderRoute: typeof ApiValidateProviderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/usage': {
@@ -1877,6 +1897,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
   ApiUpdateCheckRoute: ApiUpdateCheckRoute,
   ApiUsageRoute: ApiUsageRoute,
+  ApiValidateProviderRoute: ApiValidateProviderRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,

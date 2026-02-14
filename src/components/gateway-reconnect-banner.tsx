@@ -45,20 +45,27 @@ export function GatewayReconnectBanner() {
 
     let mounted = true
 
+    let failCount = 0
+
     async function checkHealth() {
       if (!mounted) return
       const healthy = await checkGatewayHealth()
       if (!mounted) return
 
-      if (!healthy && !isDismissed) {
-        setIsVisible(true)
-      } else {
+      if (healthy) {
+        failCount = 0
         setIsVisible(false)
+      } else {
+        failCount++
+        // Only show banner after 2 consecutive failures (avoids flash on slow initial connect)
+        if (failCount >= 2 && !isDismissed) {
+          setIsVisible(true)
+        }
       }
     }
 
-    // Initial check
-    void checkHealth()
+    // Initial check (delayed to let SSR gateway client connect)
+    const initialTimer = setTimeout(() => void checkHealth(), 3000)
 
     // Periodic checks
     const interval = setInterval(() => {
@@ -67,6 +74,7 @@ export function GatewayReconnectBanner() {
 
     return () => {
       mounted = false
+      clearTimeout(initialTimer)
       clearInterval(interval)
     }
   }, [isDismissed])

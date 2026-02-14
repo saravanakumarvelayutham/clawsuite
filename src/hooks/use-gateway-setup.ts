@@ -82,6 +82,15 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
     try {
       const configured = localStorage.getItem(SETUP_STORAGE_KEY) === 'true'
 
+      // Debug: ?wizard=provider or ?wizard=gateway forces the wizard open
+      const params = new URLSearchParams(window.location.search)
+      const forceWizard = params.get('wizard')
+      if (forceWizard) {
+        const step = forceWizard === 'provider' ? 'provider' : 'gateway'
+        set({ isOpen: true, step, gatewayUrl: 'ws://127.0.0.1:18789' })
+        return
+      }
+
       // Check if gateway is already working
       const { ok } = await pingGateway()
       if (ok) {

@@ -234,7 +234,7 @@ export function DashboardScreen() {
 
       return {
         gateway: {
-          connected: gatewayStatusQuery.data?.ok ?? false,
+          connected: gatewayStatusQuery.data?.ok ?? !gatewayStatusQuery.isError,
           checkedAtIso: nowIso,
         },
         uptimeSeconds,
