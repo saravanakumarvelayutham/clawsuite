@@ -120,10 +120,12 @@ export function DashboardScreen() {
   const { visibleIds, addWidget, removeWidget, resetVisible } =
     useVisibleWidgets()
   const containerRef = useRef<HTMLDivElement>(null)
-  const [containerWidth, setContainerWidth] = useState(1200)
+  const [containerWidth, setContainerWidth] = useState<number | null>(null)
 
   useEffect(() => {
     if (!containerRef.current) return
+    // Measure immediately on mount to avoid flash at wrong width
+    setContainerWidth(containerRef.current.getBoundingClientRect().width)
     const ro = new ResizeObserver((entries) => {
       for (const e of entries) setContainerWidth(e.contentRect.width)
     })
@@ -332,6 +334,7 @@ export function DashboardScreen() {
           </div>
 
           <div ref={containerRef}>
+            {containerWidth != null && containerWidth > 0 ? (
             <ResponsiveGridLayout
               className="layout"
               layouts={gridLayouts}
@@ -409,6 +412,11 @@ export function DashboardScreen() {
                 </div>
               ) : null}
             </ResponsiveGridLayout>
+            ) : (
+              <div className="flex h-64 items-center justify-center text-primary-400">
+                Loading dashboard…
+              </div>
+            )}
           </div>
         </section>
       </main>
