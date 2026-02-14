@@ -49,7 +49,11 @@ export function getConfiguredProviderNames(): Array<string> {
     cachedProviderNames = Array.from(providerNames).sort()
     return cachedProviderNames
   } catch (error) {
-    console.error('Failed to read Gateway config for provider names:', error)
+    // Silently return empty when config doesn't exist (e.g. Docker containers)
+    const code = (error as NodeJS.ErrnoException)?.code
+    if (code !== 'ENOENT') {
+      console.error('Failed to read Gateway config for provider names:', error)
+    }
     return []
   }
 }
@@ -91,7 +95,10 @@ export function getConfiguredModelIds(): Set<string> {
     cachedModelIds = modelIds
     return cachedModelIds
   } catch (error) {
-    console.error('Failed to read Gateway config for model IDs:', error)
+    const code = (error as NodeJS.ErrnoException)?.code
+    if (code !== 'ENOENT') {
+      console.error('Failed to read Gateway config for model IDs:', error)
+    }
     return new Set()
   }
 }
