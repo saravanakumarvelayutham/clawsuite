@@ -94,7 +94,36 @@ export const useGatewaySetupStore = create<GatewaySetupState>((set, get) => ({
         return
       }
 
-      // First run + gateway not working → load current config and show wizard
+      // First run + gateway not working → try auto-discovery
+      try {
+        const discoverRes = await fetch('/api/gateway-discover', {
+          method: 'POST',
+          signal: AbortSignal.timeout(15000),
+        })
+        const discoverData = (await discoverRes.json()) as {
+          ok?: boolean
+          url?: string
+          source?: string
+          error?: string
+        }
+
+        if (discoverData.ok) {
+          // Auto-discovery succeeded — connected!
+          localStorage.setItem(SETUP_STORAGE_KEY, 'true')
+          // Skip gateway step, go straight to provider setup
+          set({
+            isOpen: true,
+            step: 'provider',
+            gatewayUrl: discoverData.url || 'ws://127.0.0.1:18789',
+            testStatus: 'success',
+          })
+          return
+        }
+      } catch {
+        // Auto-discovery failed, fall through to manual wizard
+      }
+
+      // Auto-discovery failed → show manual wizard
       const config = await fetchCurrentConfig()
       set({
         isOpen: true,

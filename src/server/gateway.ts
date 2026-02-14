@@ -536,7 +536,7 @@ function rawDataToString(data: RawData): string {
   return data.toString()
 }
 
-const gatewayClient = new GatewayClient()
+let gatewayClient = new GatewayClient()
 
 export async function gatewayRpc<TPayload = unknown>(
   method: string,
@@ -555,4 +555,14 @@ export async function gatewayConnectCheck(): Promise<void> {
 
 export async function cleanupGatewayConnection(): Promise<void> {
   await gatewayClient.shutdown()
+}
+
+/**
+ * Force-reconnect the gateway client with current process.env values.
+ * Call this after updating CLAWDBOT_GATEWAY_URL / CLAWDBOT_GATEWAY_TOKEN.
+ */
+export async function gatewayReconnect(): Promise<void> {
+  await gatewayClient.shutdown()
+  gatewayClient = new GatewayClient()
+  await gatewayClient.ensureConnected()
 }

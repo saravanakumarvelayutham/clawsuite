@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { gatewayReconnect } from '../../server/gateway'
 
 export const Route = createFileRoute('/api/gateway-config')({
   server: {
@@ -71,7 +72,17 @@ export const Route = createFileRoute('/api/gateway-config')({
 
           await writeFile(envPath, envContent, 'utf-8')
 
-          return json({ ok: true, needsRestart: true })
+          // Force reconnect the gateway client with new credentials
+          try {
+            await gatewayReconnect()
+            return json({ ok: true, connected: true })
+          } catch (connErr) {
+            return json({
+              ok: true,
+              connected: false,
+              error: `Config saved but connection failed: ${connErr instanceof Error ? connErr.message : String(connErr)}`,
+            })
+          }
         } catch (err) {
           return json(
             { ok: false, error: err instanceof Error ? err.message : String(err) },
