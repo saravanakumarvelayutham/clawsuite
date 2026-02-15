@@ -3,7 +3,9 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlertDiamondIcon,
   ArrowTurnBackwardIcon,
+  ServerStack01Icon,
 } from '@hugeicons/core-free-icons'
+import { EmptyState } from '@/components/empty-state'
 
 type NodeEntry = {
   id?: string
@@ -109,12 +111,11 @@ export function NodesScreen() {
             </button>
           </div>
         ) : nodes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-32 gap-2">
-            <p className="text-sm text-primary-600">No nodes paired.</p>
-            <p className="text-[11px] text-primary-400">
-              Pair a device via the OpenClaw app to see it here.
-            </p>
-          </div>
+          <EmptyState
+            icon={ServerStack01Icon}
+            title="No nodes paired"
+            description="Pair a device to extend your AI capabilities."
+          />
         ) : (
           <table className="w-full text-[13px]">
             <thead>

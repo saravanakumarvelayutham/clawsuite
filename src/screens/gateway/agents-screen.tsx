@@ -3,7 +3,9 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlertDiamondIcon,
   ArrowTurnBackwardIcon,
+  BotIcon,
 } from '@hugeicons/core-free-icons'
+import { EmptyState } from '@/components/empty-state'
 
 type AgentEntry = { id: string; name?: string }
 type AgentsData = {
@@ -120,35 +122,43 @@ export function AgentsScreen() {
             </div>
 
             {/* Agent cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {agents.map((agent) => {
-                const isDefault = agent.id === query.data?.defaultId
-                return (
-                  <div
-                    key={agent.id}
-                    className={`rounded-lg border p-4 transition-colors ${
-                      isDefault
-                        ? 'border-accent-300 bg-accent-50/50'
-                        : 'border-primary-200 hover:bg-primary-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-[13px] text-ink">
-                        {agent.name || agent.id}
-                      </span>
-                      {isDefault ? (
-                        <span className="text-[10px] font-medium bg-accent-100 text-accent-700 px-1.5 py-0.5 rounded">
-                          default
+            {agents.length === 0 ? (
+              <EmptyState
+                icon={BotIcon}
+                title="No agents detected"
+                description="Start a conversation and let the AI orchestrate sub-agents."
+              />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {agents.map((agent) => {
+                  const isDefault = agent.id === query.data?.defaultId
+                  return (
+                    <div
+                      key={agent.id}
+                      className={`rounded-lg border p-4 transition-colors ${
+                        isDefault
+                          ? 'border-accent-300 bg-accent-50/50'
+                          : 'border-primary-200 hover:bg-primary-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-[13px] text-ink">
+                          {agent.name || agent.id}
                         </span>
-                      ) : null}
+                        {isDefault ? (
+                          <span className="text-[10px] font-medium bg-accent-100 text-accent-700 px-1.5 py-0.5 rounded">
+                            default
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-[11px] text-primary-500 mt-1 font-mono">
+                        {agent.id}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-primary-500 mt-1 font-mono">
-                      {agent.id}
-                    </p>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </>
         )}
       </div>

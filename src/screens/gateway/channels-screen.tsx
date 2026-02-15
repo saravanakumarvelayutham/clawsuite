@@ -3,7 +3,9 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import {
   AlertDiamondIcon,
   ArrowTurnBackwardIcon,
+  Chat01Icon,
 } from '@hugeicons/core-free-icons'
+import { EmptyState } from '@/components/empty-state'
 
 type ChannelInfo = {
   configured?: boolean
@@ -118,9 +120,11 @@ export function ChannelsScreen() {
             </button>
           </div>
         ) : Object.keys(channels).length === 0 ? (
-          <p className="text-sm text-primary-500 text-center py-8">
-            No channels configured.
-          </p>
+          <EmptyState
+            icon={Chat01Icon}
+            title="No channels configured"
+            description="Connect Telegram, Discord, or other messaging platforms in settings."
+          />
         ) : (
           <table className="w-full text-[13px]">
             <thead>
