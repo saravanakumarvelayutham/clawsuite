@@ -71,10 +71,11 @@ export function MobileTabBar() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-[60] pointer-events-none pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-[60] pb-[env(safe-area-inset-bottom)] md:hidden transform-gpu"
       aria-label="Mobile navigation"
+      style={{ WebkitTransform: 'translateZ(0)' }}
     >
-      <div className="pointer-events-auto mx-2 mb-1 grid grid-cols-5 gap-1 rounded-2xl border border-primary-200/60 bg-white/80 px-1 py-1.5 shadow-[0_2px_20px_rgba(0,0,0,0.08)] backdrop-blur-2xl backdrop-saturate-150">
+      <div className="mx-2 mb-1 grid grid-cols-5 gap-1 rounded-2xl border border-primary-200/60 bg-white/95 px-1 py-1.5 shadow-[0_2px_20px_rgba(0,0,0,0.08)] dark:bg-gray-900/95">
         {TABS.map((tab) => {
           const isActive = tab.match(pathname)
           const isCenterChat = tab.id === 'chat'

@@ -1189,6 +1189,8 @@ export function ChatScreen({
               focusKey={`${isNewChat ? 'new' : activeFriendlyId}:${activeCanonicalKey ?? ''}`}
             />
           ) : null}
+          {/* Spacer for mobile tab bar clearance when keyboard is closed */}
+          {isMobile && !compact && <div className="shrink-0 h-20" />}
         </main>
         {!compact && <AgentViewPanel />}
       </div>

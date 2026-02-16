@@ -3,7 +3,6 @@ import {
   CheckmarkCircle02Icon,
   CloudIcon,
   ComputerIcon,
-  Menu01Icon,
   MessageMultiple01Icon,
   Moon01Icon,
   Notification03Icon,
@@ -35,7 +34,7 @@ import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import type { BrailleSpinnerPreset } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
-import { useWorkspaceStore } from '@/stores/workspace-store'
+// useWorkspaceStore removed — hamburger eliminated on mobile
 
 export const Route = createFileRoute('/settings/')({
   component: SettingsRoute,
@@ -117,7 +116,6 @@ function SettingsRoute() {
   usePageTitle('Settings')
   const { settings, updateSettings } = useSettings()
   const gatewaySetup = useGatewaySetupStore()
-  const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
   const [connectionStatus, setConnectionStatus] = useState<
     'idle' | 'testing' | 'connected' | 'failed'
   >('idle')
@@ -250,16 +248,6 @@ function SettingsRoute() {
 
         {/* Mobile header */}
         <div className="flex items-center gap-2 md:hidden">
-          {isMobile && (
-            <button
-              type="button"
-              onClick={() => setSidebarCollapsed(false)}
-              className="flex size-9 items-center justify-center rounded-lg text-primary-600 active:scale-95"
-              aria-label="Open menu"
-            >
-              <HugeiconsIcon icon={Menu01Icon} size={20} strokeWidth={1.5} />
-            </button>
-          )}
           <h1 className="text-lg font-semibold text-primary-900">Settings</h1>
         </div>
 

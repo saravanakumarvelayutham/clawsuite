@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react'
 import type { TouchEvent } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 
 const TAB_ORDER = [
   '/dashboard',
@@ -66,6 +67,11 @@ export function useSwipeNavigation() {
   const gestureRef = useRef<GestureState | null>(null)
 
   const onTouchStart = useCallback((event: TouchEvent<HTMLElement>) => {
+    // Disable swipe when keyboard is open (typing mode)
+    if (useWorkspaceStore.getState().mobileKeyboardOpen) {
+      gestureRef.current = null
+      return
+    }
     const touch = event.touches[0]
     if (!touch || shouldIgnoreTarget(event.target)) {
       gestureRef.current = null
