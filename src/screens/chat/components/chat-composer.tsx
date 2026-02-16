@@ -991,12 +991,13 @@ function ChatComposerComponent({
         'z-40 mx-auto w-full shrink-0 bg-surface/95 px-3 pt-2 backdrop-blur sm:px-5',
         'pb-[calc(env(safe-area-inset-bottom)+var(--mobile-tab-bar-offset))]',
         'md:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]',
+        'transition-[padding-bottom] duration-200 ease-out',
       )}
       style={
         {
           maxWidth: 'min(768px, 100%)',
           '--mobile-tab-bar-offset': mobileKeyboardOpen
-            ? '0.5rem'
+            ? '0.25rem'
             : MOBILE_TAB_BAR_OFFSET,
         } as React.CSSProperties
       }
@@ -1080,8 +1081,15 @@ function ChatComposerComponent({
           placeholder={promptPlaceholder}
           autoFocus
           inputRef={promptRef}
-          onFocus={() => setMobileKeyboardOpen(true)}
-          onBlur={() => setTimeout(() => setMobileKeyboardOpen(false), 120)}
+          onFocus={() => {
+            // VisualViewport hook handles mobileKeyboardOpen state now,
+            // but set it eagerly on focus for immediate tab bar hide
+            setMobileKeyboardOpen(true)
+          }}
+          onBlur={() => {
+            // Let VisualViewport hook handle the close detection —
+            // it's more reliable than a fixed timeout on iOS
+          }}
           className="min-h-[44px]"
         />
         <PromptInputActions className="justify-between px-3">
