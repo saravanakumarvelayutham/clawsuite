@@ -33,8 +33,8 @@ const TABS: TabItem[] = [
     id: 'agents',
     label: 'Agent Hub',
     icon: UserMultipleIcon,
-    to: '/agents',
-    match: (p) => p.startsWith('/agents') || p.startsWith('/agent-swarm'),
+    to: '/agent-swarm',
+    match: (p) => p.startsWith('/agent-swarm') || p.startsWith('/agents'),
   },
   {
     id: 'chat',

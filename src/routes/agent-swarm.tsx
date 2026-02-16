@@ -176,35 +176,31 @@ function AgentSwarmRoute() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.22 }}
-      className="h-full overflow-auto bg-surface px-3 py-3 sm:px-4 sm:py-4"
+      className="h-full overflow-auto bg-surface px-3 py-3 pb-24 sm:px-4 sm:py-4 md:pb-4"
     >
       <div className="mx-auto max-w-[1200px]">
         {/* Page Header */}
         <header className="mb-6 rounded-2xl border border-primary-200 bg-primary-50/85 p-4 shadow-sm backdrop-blur-xl sm:p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <OrchestratorAvatar size={56} />
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-100/70 px-3 py-1 text-xs text-primary-600 tabular-nums">
-                  <HugeiconsIcon icon={BotIcon} size={16} strokeWidth={1.5} />
-                  <span>Orchestration</span>
-                </div>
-                <h1 className="mt-2 text-xl font-semibold text-balance text-primary-900 sm:text-2xl">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <OrchestratorAvatar size={48} className="shrink-0 sm:size-14" />
+              <div className="min-w-0">
+                <h1 className="text-lg font-semibold text-primary-900 sm:text-2xl">
                   Agent Hub
                 </h1>
-                <p className="mt-1 text-sm text-pretty text-primary-600">
+                <p className="text-xs text-primary-600 sm:text-sm">
                   Real-time monitoring of all active agent sessions.
                 </p>
               </div>
             </div>
 
             {/* View Toggle + Connection Status */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <div className="flex rounded-lg border border-primary-200 bg-primary-100/50 p-0.5">
                 <button
                   onClick={() => setViewMode('office')}
                   className={cn(
-                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                    'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                     viewMode === 'office'
                       ? 'bg-accent-500 text-white'
                       : 'text-primary-500 hover:text-primary-700',
@@ -215,7 +211,7 @@ function AgentSwarmRoute() {
                 <button
                   onClick={() => setViewMode('cards')}
                   className={cn(
-                    'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                    'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                     viewMode === 'cards'
                       ? 'bg-accent-500 text-white'
                       : 'text-primary-500 hover:text-primary-700',
@@ -224,23 +220,23 @@ function AgentSwarmRoute() {
                   📋 Cards
                 </button>
               </div>
-            </div>
 
-            <div
-              className={cn(
-                'flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium',
-                isConnected
-                  ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                  : 'border-red-300 bg-red-50 text-red-700',
-              )}
-            >
               <div
                 className={cn(
-                  'size-2 rounded-full',
-                  isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400',
+                  'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
+                  isConnected
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                    : 'border-red-300 bg-red-50 text-red-700',
                 )}
-              />
-              {isConnected ? 'Connected' : 'Disconnected'}
+              >
+                <div
+                  className={cn(
+                    'size-2 rounded-full',
+                    isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400',
+                  )}
+                />
+                <span className="hidden sm:inline">{isConnected ? 'Connected' : 'Disconnected'}</span>
+              </div>
             </div>
           </div>
 
@@ -273,13 +269,13 @@ function AgentSwarmRoute() {
 
         {/* Office View — split layout: office + activity panel */}
         {viewMode === 'office' && (
-          <div className="mb-6 flex h-[550px] gap-3">
-            {/* Office (left ~70%) */}
-            <div className="flex-[7] overflow-hidden rounded-2xl border border-primary-200">
+          <div className="mb-6 flex flex-col gap-3 md:h-[550px] md:flex-row">
+            {/* Office */}
+            <div className="h-[350px] overflow-hidden rounded-2xl border border-primary-200 md:h-auto md:flex-[7]">
               <IsometricOffice sessions={sessions} />
             </div>
-            {/* Activity Panel (right ~30%) */}
-            <div className="flex-[3] overflow-hidden rounded-2xl border border-primary-200">
+            {/* Activity Panel */}
+            <div className="h-[300px] overflow-hidden rounded-2xl border border-primary-200 md:h-auto md:flex-[3]">
               <ActivityPanel sessions={sessions} />
             </div>
           </div>
