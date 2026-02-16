@@ -889,10 +889,11 @@ function ChatSidebarComponent({
         width: isCollapsed ? (isMobile ? 0 : 48) : isMobile ? '85vw' : 300,
       }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      className={asideProps.className}
+      className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden')}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}
       aria-hidden={isMobile && isCollapsed ? true : undefined}
+      {...(isMobile && isCollapsed ? { inert: '' as unknown as boolean } : {})}
     >
       {/* ── Header ──────────────────────────────────────────────────── */}
       <motion.div
@@ -1013,29 +1014,33 @@ function ChatSidebarComponent({
           />
           <CollapsibleSection
             expanded={suiteExpanded || isAnySuiteActive || isCollapsed}
-            items={suiteItems}
+            items={isMobile ? suiteItems.filter(i => ['Dashboard', 'Agent Hub'].includes(i.label)) : suiteItems}
             isCollapsed={isCollapsed}
             transition={transition}
             onSelectSession={onSelectSession}
           />
 
-          {/* GATEWAY (collapsible) */}
-          <SectionLabel
-            label="Gateway"
-            isCollapsed={isCollapsed}
-            transition={transition}
-            collapsible
-            expanded={gatewayExpanded || isAnyGatewayActive}
-            onToggle={toggleGateway}
-            navigateTo={gatewayNav}
-          />
-          <CollapsibleSection
-            expanded={gatewayExpanded || isAnyGatewayActive || isCollapsed}
-            items={gatewayItems}
-            isCollapsed={isCollapsed}
-            transition={transition}
-            onSelectSession={onSelectSession}
-          />
+          {/* GATEWAY (collapsible) — hidden on mobile */}
+          {!isMobile && (
+            <>
+              <SectionLabel
+                label="Gateway"
+                isCollapsed={isCollapsed}
+                transition={transition}
+                collapsible
+                expanded={gatewayExpanded || isAnyGatewayActive}
+                onToggle={toggleGateway}
+                navigateTo={gatewayNav}
+              />
+              <CollapsibleSection
+                expanded={gatewayExpanded || isAnyGatewayActive || isCollapsed}
+                items={gatewayItems}
+                isCollapsed={isCollapsed}
+                transition={transition}
+                onSelectSession={onSelectSession}
+              />
+            </>
+          )}
         </div>
 
         {/* Sessions list */}

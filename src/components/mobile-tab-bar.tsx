@@ -71,10 +71,10 @@ export function MobileTabBar() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-[60] pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-[60] pointer-events-none pb-[env(safe-area-inset-bottom)] md:hidden"
       aria-label="Mobile navigation"
     >
-      <div className="mx-2 mb-1 grid grid-cols-5 rounded-2xl border border-white/20 bg-white/70 px-1 py-1.5 shadow-lg backdrop-blur-2xl backdrop-saturate-[1.8]">
+      <div className="pointer-events-auto mx-2 mb-1 grid grid-cols-5 rounded-2xl border border-white/10 bg-gray-900/80 px-1 py-1.5 shadow-lg backdrop-blur-2xl backdrop-saturate-150">
         {TABS.map((tab) => {
           const isActive = tab.match(pathname)
           const isCenterChat = tab.id === 'chat'
@@ -100,8 +100,8 @@ export function MobileTabBar() {
                         isActive && 'ring-2 ring-accent-300/60 shadow-md',
                       )
                     : isActive
-                      ? 'size-7 bg-accent-500 text-white'
-                      : 'size-7 text-primary-400',
+                      ? 'size-7 bg-white/20 text-white'
+                      : 'size-7 text-gray-400',
                 )}
               >
                 <HugeiconsIcon
@@ -113,7 +113,7 @@ export function MobileTabBar() {
               <span
                 className={cn(
                   'leading-tight',
-                  isActive || isCenterChat ? 'text-accent-600' : 'text-primary-400',
+                  isActive ? 'text-white' : 'text-gray-400',
                 )}
               >
                 {tab.label}

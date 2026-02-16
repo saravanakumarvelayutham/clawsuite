@@ -1,4 +1,4 @@
-import { RefreshIcon, Settings01Icon } from '@hugeicons/core-free-icons'
+import { Menu01Icon, RefreshIcon, Settings01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
@@ -41,6 +41,7 @@ import {
   fetchSessions,
 } from '@/screens/chat/chat-queries'
 import { cn } from '@/lib/utils'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 import { toast } from '@/components/ui/toast'
 
 type SessionStatusPayload = {
@@ -122,6 +123,7 @@ export function DashboardScreen() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState<number | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 767px)')
@@ -263,6 +265,16 @@ export function DashboardScreen() {
             <div className="flex items-center justify-between gap-3">
               {/* Left: Logo + name + status */}
               <div className="flex min-w-0 items-center gap-2.5">
+                {isMobile && (
+                  <button
+                    type="button"
+                    onClick={() => setSidebarCollapsed(false)}
+                    className="flex size-9 items-center justify-center rounded-lg text-primary-600 active:scale-95"
+                    aria-label="Open menu"
+                  >
+                    <HugeiconsIcon icon={Menu01Icon} size={20} strokeWidth={1.5} />
+                  </button>
+                )}
                 <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl shadow-sm" />
                 <div className="flex min-w-0 items-center gap-2.5">
                   <h1 className="text-sm font-semibold text-ink text-balance md:text-base">

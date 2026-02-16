@@ -957,7 +957,7 @@ function ChatComposerComponent({
   return (
     <div
       className={cn(
-        'z-30 mx-auto w-full shrink-0 bg-surface/95 px-3 pt-2 backdrop-blur sm:px-5',
+        'z-40 mx-auto w-full shrink-0 bg-surface/95 px-3 pt-2 backdrop-blur sm:px-5',
         'pb-[calc(env(safe-area-inset-bottom)+var(--mobile-tab-bar-offset))]',
         'md:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]',
       )}
@@ -1049,7 +1049,7 @@ function ChatComposerComponent({
           autoFocus
           inputRef={promptRef}
           onFocus={() => setMobileKeyboardOpen(true)}
-          onBlur={() => setMobileKeyboardOpen(false)}
+          onBlur={() => setTimeout(() => setMobileKeyboardOpen(false), 120)}
         />
         <PromptInputActions className="justify-between px-3">
           <div className="flex items-center gap-1">
