@@ -1,9 +1,9 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  Activity01Icon,
   Chat01Icon,
   Home01Icon,
+  PuzzleIcon,
   Settings01Icon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
@@ -31,10 +31,10 @@ const TABS: TabItem[] = [
   },
   {
     id: 'agents',
-    label: 'Agents',
+    label: 'Agent Hub',
     icon: UserMultipleIcon,
     to: '/agents',
-    match: (p) => p.startsWith('/agents'),
+    match: (p) => p.startsWith('/agents') || p.startsWith('/agent-swarm'),
   },
   {
     id: 'chat',
@@ -44,11 +44,11 @@ const TABS: TabItem[] = [
     match: (p) => p.startsWith('/chat') || p === '/new' || p === '/',
   },
   {
-    id: 'activity',
-    label: 'Activity',
-    icon: Activity01Icon,
-    to: '/activity',
-    match: (p) => p.startsWith('/activity') || p.startsWith('/logs'),
+    id: 'skills',
+    label: 'Skills',
+    icon: PuzzleIcon,
+    to: '/skills',
+    match: (p) => p.startsWith('/skills'),
   },
   {
     id: 'settings',
