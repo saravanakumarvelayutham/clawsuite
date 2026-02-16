@@ -303,26 +303,43 @@ export function DashboardScreen() {
                 </div>
               </div>
 
-              {/* Right: Clock → Theme → Bell → Gear */}
-              <div className="ml-auto flex flex-col items-end gap-1 md:flex-row md:items-center md:gap-2">
-                {!isMobile ? <HeaderAmbientStatus /> : null}
-                <ThemeToggle />
-                <div className="flex items-center gap-1 rounded-full border border-primary-200 bg-primary-100/65 p-1">
-                  <NotificationsPopover />
+              {/* Right controls */}
+              <div className="ml-auto flex items-center gap-2">
+                {!isMobile && <HeaderAmbientStatus />}
+                {!isMobile && <ThemeToggle />}
+                {!isMobile && (
+                  <div className="flex items-center gap-1 rounded-full border border-primary-200 bg-primary-100/65 p-1">
+                    <NotificationsPopover />
+                    <button
+                      type="button"
+                      onClick={() => setDashSettingsOpen(true)}
+                      className="inline-flex size-7 items-center justify-center rounded-full text-primary-600 dark:text-primary-400 transition-colors hover:bg-primary-50 dark:hover:bg-gray-800 hover:text-accent-600 dark:hover:text-accent-400"
+                      aria-label="Settings"
+                      title="Settings"
+                    >
+                      <HugeiconsIcon
+                        icon={Settings01Icon}
+                        size={20}
+                        strokeWidth={1.5}
+                      />
+                    </button>
+                  </div>
+                )}
+                {isMobile && (
                   <button
                     type="button"
                     onClick={() => setDashSettingsOpen(true)}
-                    className="inline-flex size-7 items-center justify-center rounded-full text-primary-600 dark:text-primary-400 transition-colors hover:bg-primary-50 dark:hover:bg-gray-800 hover:text-accent-600 dark:hover:text-accent-400"
-                    aria-label="Settings"
+                    className="inline-flex size-9 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 active:scale-95"
+                    aria-label="Dashboard settings"
                     title="Settings"
                   >
                     <HugeiconsIcon
                       icon={Settings01Icon}
-                      size={20}
+                      size={18}
                       strokeWidth={1.5}
                     />
                   </button>
-                </div>
+                )}
               </div>
             </div>
           </header>

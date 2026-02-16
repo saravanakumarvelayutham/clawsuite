@@ -986,7 +986,7 @@ function ChatComposerComponent({
         isLoading={isLoading}
         disabled={disabled}
         className={cn(
-          'relative transition-all duration-300',
+          'relative z-50 transition-all duration-300',
           isDraggingOver &&
             'outline-primary-500 ring-2 ring-primary-300 bg-primary-50/80',
           isLoading &&

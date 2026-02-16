@@ -604,6 +604,10 @@ function ChatSidebarComponent({
     'openclaw-sidebar-suite-expanded',
     true,
   )
+  const [systemExpanded, toggleSystem] = usePersistedBool(
+    'openclaw-sidebar-system-expanded',
+    false,
+  )
   const [gatewayExpanded, toggleGateway] = usePersistedBool(
     'openclaw-sidebar-gateway-expanded',
     false,
@@ -876,7 +880,25 @@ function ChatSidebarComponent({
   ]
 
   // Auto-expand sections if any child route is active
+  const primarySuiteLabels = ['Dashboard', 'Agent Hub', 'Skills']
+  const mobileSystemLabels = [
+    'Files',
+    'Memory',
+    'Tasks',
+    'Terminal',
+    'Browser',
+    'Cron Jobs',
+    'Logs',
+    'Debug',
+  ]
+  const mobilePrimarySuite = suiteItems.filter((item) =>
+    primarySuiteLabels.includes(item.label),
+  )
+  const mobileSecondarySuite = mobileSystemLabels
+    .map((label) => suiteItems.find((item) => item.label === label))
+    .filter((item): item is NavItemDef => Boolean(item))
   const isAnySuiteActive = suiteItems.some((i) => i.active)
+  const isAnySystemActive = mobileSecondarySuite.some((item) => item.active)
   const isAnyGatewayActive = gatewayItems.some((i) => i.active)
 
   return (
@@ -1001,50 +1023,71 @@ function ChatSidebarComponent({
       {/* ── Scrollable body: nav + sessions ─────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin flex flex-col">
         {/* Navigation sections */}
-        <div className="shrink-0 space-y-0.5 px-2">
+        <div className={cn('shrink-0 space-y-0.5 px-2', isMobile && 'order-2')}>
           {/* SUITE */}
           <SectionLabel
             label="Suite"
             isCollapsed={isCollapsed}
             transition={transition}
-            collapsible
-            expanded={suiteExpanded || isAnySuiteActive}
-            onToggle={toggleSuite}
+            collapsible={!isMobile}
+            expanded={isMobile ? true : suiteExpanded || isAnySuiteActive}
+            onToggle={isMobile ? undefined : toggleSuite}
             navigateTo={suiteNav}
           />
           <CollapsibleSection
-            expanded={suiteExpanded || isAnySuiteActive || isCollapsed}
-            items={isMobile ? suiteItems.filter(i => ['Dashboard', 'Agent Hub'].includes(i.label)) : suiteItems}
+            expanded={isMobile || suiteExpanded || isAnySuiteActive || isCollapsed}
+            items={isMobile ? mobilePrimarySuite : suiteItems}
             isCollapsed={isCollapsed}
             transition={transition}
             onSelectSession={onSelectSession}
           />
 
-          {/* GATEWAY (collapsible) — hidden on mobile */}
-          {!isMobile && (
+          {isMobile && mobileSecondarySuite.length > 0 && (
             <>
               <SectionLabel
-                label="Gateway"
+                label="System"
                 isCollapsed={isCollapsed}
                 transition={transition}
                 collapsible
-                expanded={gatewayExpanded || isAnyGatewayActive}
-                onToggle={toggleGateway}
-                navigateTo={gatewayNav}
+                expanded={systemExpanded || isAnySystemActive}
+                onToggle={toggleSystem}
               />
               <CollapsibleSection
-                expanded={gatewayExpanded || isAnyGatewayActive || isCollapsed}
-                items={gatewayItems}
+                expanded={systemExpanded || isAnySystemActive || isCollapsed}
+                items={mobileSecondarySuite}
                 isCollapsed={isCollapsed}
                 transition={transition}
                 onSelectSession={onSelectSession}
               />
             </>
           )}
+
+          {/* GATEWAY */}
+          <SectionLabel
+            label="Gateway"
+            isCollapsed={isCollapsed}
+            transition={transition}
+            collapsible
+            expanded={gatewayExpanded || isAnyGatewayActive}
+            onToggle={toggleGateway}
+            navigateTo={gatewayNav}
+          />
+          <CollapsibleSection
+            expanded={gatewayExpanded || isAnyGatewayActive || isCollapsed}
+            items={gatewayItems}
+            isCollapsed={isCollapsed}
+            transition={transition}
+            onSelectSession={onSelectSession}
+          />
         </div>
 
         {/* Sessions list */}
-        <div className="shrink-0 border-t border-primary-200/60 mt-1">
+        <div
+          className={cn(
+            'shrink-0 border-t border-primary-200/60 mt-1',
+            isMobile && 'order-1',
+          )}
+        >
           <AnimatePresence initial={false}>
             {!isCollapsed && (
               <motion.div
