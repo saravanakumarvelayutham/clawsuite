@@ -62,14 +62,18 @@ const TABS: TabItem[] = [
 export function MobileTabBar() {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const mobileKeyboardOpen = useWorkspaceStore((s) => s.mobileKeyboardOpen)
+  const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
+  const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
+  const isChatRoute =
+    pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
+  const hideForChat = isChatRoute && (mobileKeyboardInset > 0 || mobileComposerFocused)
 
   return (
     <nav
       className={cn(
-        'fixed inset-x-0 bottom-0 z-[60] bg-primary-50/95 pb-[env(safe-area-inset-bottom)] md:hidden transform-gpu transition-all duration-200',
-        mobileKeyboardOpen
-          ? 'translate-y-full opacity-0 pointer-events-none'
+        'fixed inset-x-0 bottom-0 z-[60] bg-primary-50/95 pb-[var(--safe-b)] md:hidden transform-gpu will-change-transform transition-all duration-200',
+        hideForChat
+          ? 'translate-y-[110%] opacity-0 pointer-events-none'
           : 'translate-y-0 opacity-100',
       )}
       aria-label="Mobile navigation"

@@ -116,7 +116,8 @@ type ChatMessageListProps = {
   streamingText?: string
   streamingThinking?: string
   isStreaming?: boolean
-  bottomOffset?: number
+  bottomOffset?: number | string
+  keyboardInset?: number
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
   hideSystemMessages?: boolean
 }
@@ -140,6 +141,7 @@ function ChatMessageListComponent({
   streamingThinking,
   isStreaming = false,
   bottomOffset = 0,
+  keyboardInset = 0,
   activeToolCalls = [],
   hideSystemMessages = false,
 }: ChatMessageListProps) {
@@ -161,6 +163,7 @@ function ChatMessageListComponent({
   const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false)
   const [messageSearchValue, setMessageSearchValue] = useState('')
   const [activeSearchMatchIndex, setActiveSearchMatchIndex] = useState(0)
+  const keyboardInsetRef = useRef(keyboardInset)
   const [scrollMetrics] = useState({
     scrollTop: 0,
     scrollHeight: 0,
@@ -756,12 +759,37 @@ function ChatMessageListComponent({
     [scrollToBottom],
   )
 
+  useEffect(() => {
+    const previousInset = keyboardInsetRef.current
+    keyboardInsetRef.current = keyboardInset
+
+    if (keyboardInset <= previousInset || keyboardInset <= 0) return
+    if (!isNearBottomRef.current) return
+
+    let frameOne = 0
+    let frameTwo = 0
+    frameOne = window.requestAnimationFrame(() => {
+      frameTwo = window.requestAnimationFrame(() => {
+        scrollToBottom('auto')
+      })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frameOne)
+      window.cancelAnimationFrame(frameTwo)
+    }
+  }, [keyboardInset, scrollToBottom])
+
   const scrollToBottomOverlay = useMemo(() => {
     const isVisible = !isNearBottom && displayMessages.length > 0
+    const overlayBottom =
+      typeof bottomOffset === 'number'
+        ? `${bottomOffset + 24}px`
+        : `calc(${bottomOffset} + 24px)`
     return (
       <div
         className="pointer-events-none absolute left-1/2 z-40 -translate-x-1/2"
-        style={{ bottom: `${bottomOffset + 24}px` }}
+        style={{ bottom: overlayBottom }}
       >
         <ScrollToBottomButton
           isVisible={isVisible}
@@ -1151,6 +1179,8 @@ function areChatMessageListEqual(
     prev.streamingText === next.streamingText &&
     prev.streamingThinking === next.streamingThinking &&
     prev.isStreaming === next.isStreaming &&
+    prev.bottomOffset === next.bottomOffset &&
+    prev.keyboardInset === next.keyboardInset &&
     prev.activeToolCalls === next.activeToolCalls &&
     prev.hideSystemMessages === next.hideSystemMessages
   )

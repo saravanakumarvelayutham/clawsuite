@@ -5,6 +5,12 @@
   isolation: isolate;
 }
 
+:root {
+  --kb-inset: 0px;
+  --vvh: 100dvh;
+  --safe-b: env(safe-area-inset-bottom);
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {

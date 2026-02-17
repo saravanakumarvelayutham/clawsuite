@@ -59,12 +59,30 @@ function bindGlobalPromptListener() {
     const isEditKey = event.key === 'Backspace'
     if (!isPrintable && !isEditKey) return
     if (!globalPromptTarget || globalPromptTarget.disabled) return
-    globalPromptTarget.focus()
+    focusTextareaTarget(globalPromptTarget)
   })
 }
 
 function usePromptInput() {
   return useContext(PromptInputContext)
+}
+
+function focusTextareaTarget(target: HTMLTextAreaElement | null) {
+  if (!target) return
+  try {
+    target.focus({ preventScroll: true })
+  } catch {
+    target.focus()
+  }
+}
+
+function isInteractiveTarget(target: HTMLElement | null): boolean {
+  if (!target) return false
+  return Boolean(
+    target.closest(
+      'button, a, select, input[type="file"], [role="button"], [contenteditable]',
+    ),
+  )
 }
 
 export type PromptInputProps = {
@@ -102,13 +120,21 @@ function PromptInput({
   }
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!disabled) textareaRef.current?.focus()
+    const target = e.target instanceof HTMLElement ? e.target : null
+    if (!disabled && !isInteractiveTarget(target)) {
+      focusTextareaTarget(textareaRef.current)
+    }
     onClick?.(e)
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (!disabled && e.pointerType === 'touch') {
-      textareaRef.current?.focus()
+    const target = e.target instanceof HTMLElement ? e.target : null
+    if (
+      !disabled &&
+      e.pointerType === 'touch' &&
+      !isInteractiveTarget(target)
+    ) {
+      focusTextareaTarget(textareaRef.current)
     }
     onPointerDown?.(e)
   }
@@ -130,7 +156,7 @@ function PromptInput({
           onClick={handleClick}
           onPointerDown={handlePointerDown}
           className={cn(
-            'bg-surface cursor-text rounded-[22px] outline outline-ink/10 shadow-[0px_12px_32px_0px_rgba(0,0,0,0.05)] py-3 gap-3 flex flex-col',
+            'bg-surface cursor-text rounded-[22px] outline outline-ink/10 shadow-[0px_12px_32px_0px_rgba(0,0,0,0.05)] py-3 gap-3 flex flex-col touch-manipulation',
             disabled && 'cursor-not-allowed opacity-60',
             className,
           )}

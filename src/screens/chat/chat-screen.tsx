@@ -64,6 +64,7 @@ import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
+import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useTapDebug } from '@/hooks/use-tap-debug'
 
 type ChatScreenProps = {
@@ -170,6 +171,9 @@ export function ChatScreen({
     return stored === null ? true : stored === 'true'
   })
   const { isMobile } = useChatMobile(queryClient)
+  const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
+  const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
+  const mobileKeyboardActive = mobileKeyboardInset > 0 || mobileComposerFocused
   const isAgentViewOpen = useAgentViewStore((state) => state.isOpen)
   const isTerminalPanelOpen = useTerminalPanelStore(
     (state) => state.isPanelOpen,
@@ -496,18 +500,31 @@ export function ChatScreen({
 
   const terminalPanelInset =
     !isMobile && isTerminalPanelOpen ? terminalPanelHeight : 0
-  const mobileMessageInset = isMobile
-    ? '1rem'
-    : null
-  // Keep message list clear of the mobile tab bar and desktop terminal panel.
+  const mobileScrollBottomOffset = useMemo(() => {
+    if (!isMobile) return 0
+    if (mobileKeyboardActive) {
+      return 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
+    }
+    return `calc(var(--chat-composer-height, 96px) + ${MOBILE_TAB_BAR_OFFSET})`
+  }, [isMobile, mobileKeyboardActive])
+
+  // Keep message list clear of composer, keyboard, and desktop terminal panel.
   const stableContentStyle = useMemo<React.CSSProperties>(() => {
+    if (isMobile) {
+      const mobileBase = mobileKeyboardActive
+        ? 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
+        : `calc(var(--chat-composer-height, 96px) + ${MOBILE_TAB_BAR_OFFSET})`
+      return {
+        paddingBottom: `calc(${mobileBase} + var(--safe-b) + 16px)`,
+      }
+    }
     return {
       paddingBottom:
         terminalPanelInset > 0
           ? `${terminalPanelInset + 16}px`
-          : mobileMessageInset || '16px',
+          : '16px',
     }
-  }, [mobileMessageInset, terminalPanelInset])
+  }, [isMobile, mobileKeyboardActive, terminalPanelInset])
 
   const shouldRedirectToNew =
     !isNewChat &&
@@ -1167,7 +1184,8 @@ export function ChatScreen({
               pinGroupMinHeight={pinGroupMinHeight}
               headerHeight={headerHeight}
               contentStyle={stableContentStyle}
-              bottomOffset={terminalPanelInset}
+              bottomOffset={isMobile ? mobileScrollBottomOffset : terminalPanelInset}
+              keyboardInset={mobileKeyboardInset}
               isStreaming={derivedStreamingInfo.isStreaming}
               streamingMessageId={derivedStreamingInfo.streamingMessageId}
               streamingText={realtimeStreamingText || undefined}

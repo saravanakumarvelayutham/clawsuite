@@ -68,7 +68,8 @@ export function useSwipeNavigation() {
 
   const onTouchStart = useCallback((event: TouchEvent<HTMLElement>) => {
     // Disable swipe when keyboard is open (typing mode)
-    if (useWorkspaceStore.getState().mobileKeyboardOpen) {
+    const workspace = useWorkspaceStore.getState()
+    if (workspace.mobileKeyboardOpen || workspace.mobileComposerFocused) {
       gestureRef.current = null
       return
     }

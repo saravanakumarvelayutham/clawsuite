@@ -295,6 +295,15 @@ async function fetchCurrentModelFromStatus(): Promise<string> {
   }
 }
 
+function focusPromptTarget(target: HTMLTextAreaElement | null) {
+  if (!target) return
+  try {
+    target.focus({ preventScroll: true })
+  } catch {
+    target.focus()
+  }
+}
+
 function ChatComposerComponent({
   onSubmit,
   isLoading,
@@ -304,15 +313,25 @@ function ChatComposerComponent({
   composerRef,
   focusKey,
 }: ChatComposerProps) {
-  const mobileKeyboardOpen = useWorkspaceStore((s) => s.mobileKeyboardOpen)
+  const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
+  const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
   const setMobileKeyboardOpen = useWorkspaceStore((s) => s.setMobileKeyboardOpen)
+  const setMobileKeyboardInset = useWorkspaceStore(
+    (s) => s.setMobileKeyboardInset,
+  )
+  const setMobileComposerFocused = useWorkspaceStore(
+    (s) => s.setMobileComposerFocused,
+  )
   const [value, setValue] = useState('')
   const [attachments, setAttachments] = useState<Array<ChatComposerAttachment>>(
     [],
   )
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [focusAfterSubmitTick, setFocusAfterSubmitTick] = useState(0)
-  const [isMobileViewport, setIsMobileViewport] = useState(false)
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 767px)').matches
+  })
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
   const [modelNotice, setModelNotice] = useState<ModelSwitchNotice | null>(null)
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
@@ -517,7 +536,7 @@ function ChatComposerComponent({
       focusFrameRef.current = window.requestAnimationFrame(
         function focusPromptInFrame() {
           focusFrameRef.current = null
-          promptRef.current?.focus()
+          focusPromptTarget(promptRef.current)
         },
       )
     },
@@ -533,14 +552,24 @@ function ChatComposerComponent({
     [cancelFocusPromptFrame],
   )
 
+  useEffect(
+    function cleanupMobileComposerFocusOnUnmount() {
+      return function cleanupMobileComposerFocus() {
+        setMobileComposerFocused(false)
+      }
+    },
+    [setMobileComposerFocused],
+  )
+
   const resetDragState = useCallback(() => {
     dragCounterRef.current = 0
     setIsDraggingOver(false)
   }, [])
 
   useLayoutEffect(() => {
+    if (isMobileViewport) return
     focusPrompt()
-  }, [focusPrompt])
+  }, [focusPrompt, isMobileViewport])
 
   useLayoutEffect(() => {
     if (disabled) return
@@ -556,10 +585,11 @@ function ChatComposerComponent({
 
   useLayoutEffect(() => {
     if (disabled) return
+    if (isMobileViewport) return
     // Only focus on focusKey change (session switch), not on every disabled toggle
     focusPrompt()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusKey])
+  }, [focusKey, isMobileViewport])
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return
@@ -967,24 +997,32 @@ function ChatComposerComponent({
     [wrapperRef],
   )
 
+  const keyboardOrFocusActive = mobileKeyboardInset > 0 || mobileComposerFocused
   const composerWrapperStyle = useMemo(
-    () =>
-      ({
+    () => {
+      const tabBarOffset = keyboardOrFocusActive
+        ? '0px'
+        : 'var(--mobile-tab-bar-offset)'
+      const mobileTranslate = `translateY(calc(-1 * (${tabBarOffset} + var(--kb-inset, 0px))))`
+      return {
         maxWidth: 'min(768px, 100%)',
         '--mobile-tab-bar-offset': MOBILE_TAB_BAR_OFFSET,
-      }) as CSSProperties,
-    [],
+        transform: isMobileViewport ? mobileTranslate : undefined,
+        WebkitTransform: isMobileViewport ? mobileTranslate : undefined,
+      } as CSSProperties
+    },
+    [isMobileViewport, keyboardOrFocusActive],
   )
 
   return (
     <div
       className={cn(
-        'pointer-events-auto z-40 mx-auto w-full shrink-0 bg-surface px-3 pt-2 sm:px-5 md:bg-surface/95 md:backdrop-blur',
-        mobileKeyboardOpen
-          ? 'pb-[max(env(safe-area-inset-bottom),0.25rem)]'
-          : 'pb-[calc(env(safe-area-inset-bottom)+var(--mobile-tab-bar-offset))]',
-        'md:pb-[calc(env(safe-area-inset-bottom)+0.75rem)]',
-        'md:transition-[padding-bottom,background-color,backdrop-filter] md:duration-200',
+        'no-swipe pointer-events-auto mx-auto w-full bg-surface px-3 pt-2 sm:px-5 touch-manipulation',
+        isMobileViewport
+          ? 'fixed inset-x-0 bottom-0 z-[70] transition-transform duration-200'
+          : 'relative z-40 shrink-0',
+        'pb-[max(var(--safe-b),0.25rem)] md:pb-[calc(var(--safe-b)+0.75rem)]',
+        'md:bg-surface/95 md:backdrop-blur md:transition-[padding-bottom,background-color,backdrop-filter] md:duration-200',
       )}
       style={composerWrapperStyle}
       ref={setWrapperRefs}
@@ -1067,14 +1105,18 @@ function ChatComposerComponent({
           autoFocus
           inputRef={promptRef}
           onFocus={() => {
+            setMobileComposerFocused(true)
             // Keep fallback behavior for browsers without visualViewport.
             if (!window.visualViewport) {
               setMobileKeyboardOpen(true)
+              setMobileKeyboardInset(0)
             }
           }}
           onBlur={() => {
+            setMobileComposerFocused(false)
             if (!window.visualViewport) {
               setMobileKeyboardOpen(false)
+              setMobileKeyboardInset(0)
             }
           }}
           className="min-h-[44px]"
