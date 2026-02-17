@@ -67,7 +67,7 @@ export function MobileTabBar() {
   return (
     <nav
       className={cn(
-        'fixed inset-x-0 bottom-0 z-[60] pb-[env(safe-area-inset-bottom)] md:hidden transform-gpu transition-all duration-200',
+        'fixed inset-x-0 bottom-0 z-[60] bg-primary-50/95 pb-[env(safe-area-inset-bottom)] md:hidden transform-gpu transition-all duration-200',
         mobileKeyboardOpen
           ? 'translate-y-full opacity-0 pointer-events-none'
           : 'translate-y-0 opacity-100',
@@ -75,7 +75,7 @@ export function MobileTabBar() {
       aria-label="Mobile navigation"
       style={{ WebkitTransform: 'translateZ(0)' }}
     >
-      <div className="mx-2 mb-1 grid grid-cols-5 gap-1 rounded-2xl border border-primary-200/60 bg-white/95 px-1 py-1.5 shadow-[0_2px_20px_rgba(0,0,0,0.08)] dark:bg-gray-900/95">
+      <div className="mx-2 mb-0 grid grid-cols-5 gap-1 rounded-2xl border border-primary-200/60 px-1 py-1.5 shadow-[0_2px_20px_rgba(0,0,0,0.08)]">
         {TABS.map((tab) => {
           const isActive = tab.match(pathname)
           const isCenterChat = tab.id === 'chat'
@@ -87,7 +87,7 @@ export function MobileTabBar() {
               aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[10px] font-medium transition-transform duration-150 active:scale-90',
-                isCenterChat ? '-translate-y-1' : '',
+                isCenterChat ? '-translate-y-1.5' : '',
               )}
             >
               <span
@@ -95,8 +95,8 @@ export function MobileTabBar() {
                   'flex items-center justify-center rounded-full transition-all duration-150',
                   isCenterChat
                     ? cn(
-                        'size-9 bg-accent-500 text-white shadow-sm',
-                        isActive && 'ring-1 ring-accent-200/40 shadow-sm',
+                        'size-10 bg-accent-500 text-white shadow-sm',
+                        isActive && 'ring-1 ring-accent-300/30 shadow-sm',
                       )
                     : isActive
                       ? 'size-7 bg-accent-500/15 text-accent-600'

@@ -979,7 +979,7 @@ function ChatComposerComponent({
   return (
     <div
       className={cn(
-        'z-40 mx-auto w-full shrink-0 bg-surface px-3 pt-2 sm:px-5 md:bg-surface/95 md:backdrop-blur',
+        'pointer-events-auto z-40 mx-auto w-full shrink-0 bg-surface px-3 pt-2 sm:px-5 md:bg-surface/95 md:backdrop-blur',
         mobileKeyboardOpen
           ? 'pb-[max(env(safe-area-inset-bottom),0.25rem)]'
           : 'pb-[calc(env(safe-area-inset-bottom)+var(--mobile-tab-bar-offset))]',

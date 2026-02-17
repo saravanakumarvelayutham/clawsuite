@@ -1,13 +1,16 @@
 import {
-  MoreHorizontalIcon,
+  DragDropIcon,
   RefreshIcon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { motion } from 'motion/react'
 import {
   type MouseEvent,
+  type ReactNode,
+  type TouchEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -57,6 +60,10 @@ import {
 import { fetchCronJobs } from '@/lib/cron-api'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
+import {
+  type DashboardWidgetOrderId,
+  useWidgetReorder,
+} from '@/hooks/use-widget-reorder'
 
 type SessionStatusPayload = {
   ok?: boolean
@@ -81,6 +88,23 @@ type DashboardCostSummaryPayload = {
     }>
   }
 }
+
+type MobileWidgetSection = {
+  id: DashboardWidgetOrderId
+  label: string
+  content: ReactNode
+}
+
+type MobileDragState = {
+  activeId: DashboardWidgetOrderId
+  fromVisibleIndex: number
+  startY: number
+  currentY: number
+  targetVisibleIndex: number
+  itemHeight: number
+}
+
+const MOBILE_WIDGET_GAP_PX = 12
 
 function readNumeric(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -217,9 +241,19 @@ export function DashboardScreen() {
   const [overflowOpen, setOverflowOpen] = useState(false)
   const { visibleIds, addWidget, removeWidget, resetVisible } =
     useVisibleWidgets()
+  const { order: widgetOrder, moveWidget, resetOrder } = useWidgetReorder()
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState<number | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [mobileEditMode, setMobileEditMode] = useState(false)
+  const [mobileDragState, setMobileDragState] = useState<MobileDragState | null>(
+    null,
+  )
+  const mobileItemRefs = useRef<
+    Partial<Record<DashboardWidgetOrderId, HTMLDivElement | null>>
+  >({})
+  const mobileVisibleSectionIdsRef = useRef<Array<DashboardWidgetOrderId>>([])
+  const widgetOrderRef = useRef(widgetOrder)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [mobileTipDismissed, setMobileTipDismissed] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -238,6 +272,15 @@ export function DashboardScreen() {
     const interval = window.setInterval(() => setNowMs(Date.now()), 60_000)
     return () => window.clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    widgetOrderRef.current = widgetOrder
+  }, [widgetOrder])
+
+  useEffect(() => {
+    if (mobileEditMode) return
+    setMobileDragState(null)
+  }, [mobileEditMode])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -268,7 +311,10 @@ export function DashboardScreen() {
     const fresh = resetLayouts()
     setGridLayouts(fresh)
     resetVisible()
-  }, [resetVisible])
+    resetOrder()
+    setMobileEditMode(false)
+    setMobileDragState(null)
+  }, [resetOrder, resetVisible])
 
   const sessionsQuery = useQuery({
     queryKey: chatQueryKeys.sessions,
@@ -484,6 +530,353 @@ export function DashboardScreen() {
     [costTimeseriesQuery, usageSummaryQuery],
   )
 
+  const visibleWidgetSet = useMemo(() => {
+    return new Set(visibleIds)
+  }, [visibleIds])
+
+  const mobileSections = useMemo<Array<MobileWidgetSection>>(
+    function buildMobileSections() {
+      const sections: Array<MobileWidgetSection> = []
+
+      for (const widgetId of widgetOrder) {
+        if (widgetId === 'now-card') {
+          sections.push({
+            id: widgetId,
+            label: 'Now',
+            content: (
+              <NowCard
+                gatewayConnected={systemStatus.gateway.connected}
+                activeAgents={systemStatus.activeAgents}
+                activeTasks={taskSummary.inProgress}
+              />
+            ),
+          })
+          continue
+        }
+
+        if (widgetId === 'metrics') {
+          sections.push({
+            id: widgetId,
+            label: 'Metrics',
+            content: (
+              <HeroMetricsRow
+                totalSessions={systemStatus.totalSessions}
+                activeAgents={systemStatus.activeAgents}
+                uptimeSeconds={systemStatus.uptimeSeconds}
+                totalSpend={heroCostQuery.data ?? '—'}
+                costError={heroCostQuery.isError}
+                onRetryCost={() => heroCostQuery.refetch()}
+              />
+            ),
+          })
+          continue
+        }
+
+        if (widgetId === 'skills') {
+          if (!visibleWidgetSet.has('skills')) continue
+          sections.push({
+            id: widgetId,
+            label: 'Skills',
+            content: (
+              <div className="w-full">
+                <CollapsibleWidget
+                  title="Skills"
+                  summary={`Skills: ${enabledSkillsCount} enabled`}
+                  defaultOpen={false}
+                >
+                  <SkillsWidget onRemove={() => removeWidget('skills')} />
+                </CollapsibleWidget>
+              </div>
+            ),
+          })
+          continue
+        }
+
+        if (widgetId === 'usage') {
+          if (!visibleWidgetSet.has('usage-meter')) continue
+          sections.push({
+            id: widgetId,
+            label: 'Usage',
+            content: (
+              <div className="w-full">
+                <CollapsibleWidget
+                  title="Usage Meter"
+                  summary={usageSummary.text}
+                  defaultOpen={false}
+                  action={
+                    usageSummary.state === 'error' ? (
+                      <button
+                        type="button"
+                        onClick={retryUsageSummary}
+                        className="rounded-md border border-red-200 bg-red-50/80 px-1.5 py-0.5 text-[10px] font-medium text-red-700 transition-colors hover:bg-red-100"
+                      >
+                        Retry
+                      </button>
+                    ) : null
+                  }
+                >
+                  {usageSummary.state === 'error' ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50/80 px-3 py-2 text-sm text-red-700">
+                      <p className="font-medium">Usage unavailable</p>
+                      <button
+                        type="button"
+                        onClick={retryUsageSummary}
+                        className="mt-2 rounded-md border border-red-200 bg-red-100/80 px-2 py-1 text-xs font-medium transition-colors hover:bg-red-100"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : (
+                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} />
+                  )}
+                </CollapsibleWidget>
+              </div>
+            ),
+          })
+          continue
+        }
+
+        if (widgetId === 'tasks') {
+          if (!visibleWidgetSet.has('tasks')) continue
+          sections.push({
+            id: widgetId,
+            label: 'Tasks',
+            content: (
+              <div className="w-full">
+                <CollapsibleWidget
+                  title="Tasks"
+                  summary={`Tasks: ${taskSummary.backlog} backlog • ${taskSummary.inProgress} in progress • ${taskSummary.done} done`}
+                  defaultOpen
+                >
+                  <TasksWidget onRemove={() => removeWidget('tasks')} />
+                </CollapsibleWidget>
+              </div>
+            ),
+          })
+          continue
+        }
+
+        if (widgetId === 'agents') {
+          if (!visibleWidgetSet.has('agent-status')) continue
+          sections.push({
+            id: widgetId,
+            label: 'Agents',
+            content: (
+              <div className="w-full">
+                <AgentStatusWidget onRemove={() => removeWidget('agent-status')} />
+              </div>
+            ),
+          })
+          continue
+        }
+
+        if (widgetId === 'sessions') {
+          if (!visibleWidgetSet.has('recent-sessions')) continue
+          sections.push({
+            id: widgetId,
+            label: 'Sessions',
+            content: (
+              <div className="w-full">
+                <RecentSessionsWidget
+                  onOpenSession={(sessionKey) =>
+                    navigate({
+                      to: '/chat/$sessionKey',
+                      params: { sessionKey },
+                    })
+                  }
+                  onRemove={() => removeWidget('recent-sessions')}
+                />
+              </div>
+            ),
+          })
+          continue
+        }
+
+        if (widgetId === 'notifications') {
+          if (!visibleWidgetSet.has('notifications')) continue
+          sections.push({
+            id: widgetId,
+            label: 'Notifications',
+            content: (
+              <div className="w-full">
+                <NotificationsWidget onRemove={() => removeWidget('notifications')} />
+              </div>
+            ),
+          })
+          continue
+        }
+
+        if (widgetId === 'activity') {
+          if (!visibleWidgetSet.has('activity-log')) continue
+          sections.push({
+            id: widgetId,
+            label: 'Activity',
+            content: (
+              <div className="w-full">
+                <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
+              </div>
+            ),
+          })
+        }
+      }
+
+      return sections
+    },
+    [
+      enabledSkillsCount,
+      heroCostQuery.data,
+      heroCostQuery.isError,
+      navigate,
+      removeWidget,
+      retryUsageSummary,
+      systemStatus.activeAgents,
+      systemStatus.gateway.connected,
+      systemStatus.totalSessions,
+      systemStatus.uptimeSeconds,
+      taskSummary.backlog,
+      taskSummary.done,
+      taskSummary.inProgress,
+      usageSummary.state,
+      usageSummary.text,
+      visibleWidgetSet,
+      widgetOrder,
+      heroCostQuery.refetch,
+    ],
+  )
+
+  useEffect(() => {
+    mobileVisibleSectionIdsRef.current = mobileSections.map((section) => section.id)
+  }, [mobileSections])
+
+  const handleWidgetTouchStart = useCallback(
+    (
+      event: TouchEvent<HTMLButtonElement>,
+      visibleIndex: number,
+      sectionId: DashboardWidgetOrderId,
+    ) => {
+      if (!mobileEditMode) return
+      const touch = event.touches[0]
+      if (!touch) return
+      event.preventDefault()
+      event.stopPropagation()
+
+      const sectionEl = mobileItemRefs.current[sectionId]
+      const sectionHeight = sectionEl?.getBoundingClientRect().height ?? 84
+
+      setMobileDragState({
+        activeId: sectionId,
+        fromVisibleIndex: visibleIndex,
+        startY: touch.clientY,
+        currentY: touch.clientY,
+        targetVisibleIndex: visibleIndex,
+        itemHeight: sectionHeight,
+      })
+    },
+    [mobileEditMode],
+  )
+
+  useEffect(() => {
+    if (!mobileEditMode || !mobileDragState) return
+
+    function handleTouchMove(event: globalThis.TouchEvent) {
+      const touch = event.touches[0]
+      if (!touch) return
+      event.preventDefault()
+
+      setMobileDragState((previous) => {
+        if (!previous) return previous
+        const sectionIds = mobileVisibleSectionIdsRef.current
+        if (sectionIds.length === 0) return previous
+
+        let nextTargetIndex = sectionIds.length - 1
+        for (let index = 0; index < sectionIds.length; index += 1) {
+          const id = sectionIds[index]
+          if (id === previous.activeId) continue
+          const sectionEl = mobileItemRefs.current[id]
+          if (!sectionEl) continue
+          const rect = sectionEl.getBoundingClientRect()
+          const midpoint = rect.top + rect.height / 2
+          if (touch.clientY < midpoint) {
+            nextTargetIndex = index
+            break
+          }
+        }
+
+        return {
+          ...previous,
+          currentY: touch.clientY,
+          targetVisibleIndex: Math.min(
+            sectionIds.length - 1,
+            Math.max(0, nextTargetIndex),
+          ),
+        }
+      })
+    }
+
+    function handleTouchEnd() {
+      setMobileDragState((previous) => {
+        if (!previous) return previous
+        const sectionIds = mobileVisibleSectionIdsRef.current
+        const fromId = sectionIds[previous.fromVisibleIndex]
+        const toId = sectionIds[previous.targetVisibleIndex]
+        if (!fromId || !toId || fromId === toId) return null
+
+        const nextOrder = widgetOrderRef.current
+        const fromOrderIndex = nextOrder.indexOf(fromId)
+        const toOrderIndex = nextOrder.indexOf(toId)
+        if (fromOrderIndex !== -1 && toOrderIndex !== -1) {
+          moveWidget(fromOrderIndex, toOrderIndex)
+        }
+        return null
+      })
+    }
+
+    window.addEventListener('touchmove', handleTouchMove, { passive: false })
+    window.addEventListener('touchend', handleTouchEnd)
+    window.addEventListener('touchcancel', handleTouchEnd)
+    return () => {
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', handleTouchEnd)
+      window.removeEventListener('touchcancel', handleTouchEnd)
+    }
+  }, [mobileDragState?.activeId, mobileEditMode, moveWidget])
+
+  const getMobileItemTranslateY = useCallback(
+    (visibleIndex: number) => {
+      if (!mobileDragState) return 0
+
+      const fromVisibleIndex = mobileDragState.fromVisibleIndex
+      const targetVisibleIndex = mobileDragState.targetVisibleIndex
+      const dragOffset = mobileDragState.currentY - mobileDragState.startY
+
+      if (visibleIndex === fromVisibleIndex) {
+        return dragOffset
+      }
+
+      const travelDistance =
+        Math.max(0, mobileDragState.itemHeight) + MOBILE_WIDGET_GAP_PX
+
+      if (
+        fromVisibleIndex < targetVisibleIndex &&
+        visibleIndex > fromVisibleIndex &&
+        visibleIndex <= targetVisibleIndex
+      ) {
+        return -travelDistance
+      }
+
+      if (
+        fromVisibleIndex > targetVisibleIndex &&
+        visibleIndex >= targetVisibleIndex &&
+        visibleIndex < fromVisibleIndex
+      ) {
+        return travelDistance
+      }
+
+      return 0
+    },
+    [mobileDragState],
+  )
+
   return (
     <>
       <main className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-3 pt-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 md:px-6 md:pt-8 md:pb-8">
@@ -492,21 +885,18 @@ export function DashboardScreen() {
             <div className="flex items-center justify-between gap-3">
               {/* Left: Logo + name + status */}
               <div className="flex min-w-0 items-center gap-2.5">
-                {isMobile && (
+                {isMobile ? (
                   <button
                     type="button"
                     onClick={() => setOverflowOpen(true)}
-                    className="flex size-9 items-center justify-center rounded-lg text-primary-600 active:scale-95"
-                    aria-label="Open tools"
+                    className="shrink-0 cursor-pointer rounded-xl transition-transform active:scale-95"
+                    aria-label="Open quick menu"
                   >
-                    <HugeiconsIcon
-                      icon={MoreHorizontalIcon}
-                      size={20}
-                      strokeWidth={1.5}
-                    />
+                    <OpenClawStudioIcon className="size-8 rounded-xl shadow-sm" />
                   </button>
+                ) : (
+                  <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl shadow-sm" />
                 )}
-                <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl shadow-sm" />
                 <div className="flex min-w-0 items-center gap-2.5">
                   <h1 className="text-sm font-semibold text-ink text-balance md:text-base truncate">
                     {isMobile ? 'ClawSuite' : 'ClawSuite'}
@@ -527,9 +917,11 @@ export function DashboardScreen() {
                           : 'bg-red-500',
                       )}
                     />
-                    {systemStatus.gateway.connected
-                      ? 'Connected'
-                      : 'Disconnected'}
+                    <span className="hidden sm:inline">
+                      {systemStatus.gateway.connected
+                        ? 'Connected'
+                        : 'Disconnected'}
+                    </span>
                   </span>
                 </div>
               </div>
@@ -583,13 +975,6 @@ export function DashboardScreen() {
             </p>
           </div>
 
-          <NowCard
-            className="mb-3"
-            gatewayConnected={systemStatus.gateway.connected}
-            activeAgents={systemStatus.activeAgents}
-            activeTasks={taskSummary.inProgress}
-          />
-
           {!mobileTipDismissed ? (
             <div className="mb-3 px-1 md:hidden">
               <div className="flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50/90 px-3 py-1.5 text-[11px] shadow-sm">
@@ -612,18 +997,37 @@ export function DashboardScreen() {
             <ActivityTicker />
           </div>
 
-          <HeroMetricsRow
-            totalSessions={systemStatus.totalSessions}
-            activeAgents={systemStatus.activeAgents}
-            uptimeSeconds={systemStatus.uptimeSeconds}
-            totalSpend={heroCostQuery.data ?? '—'}
-            costError={heroCostQuery.isError}
-            onRetryCost={() => heroCostQuery.refetch()}
-          />
+          {!isMobile ? (
+            <HeroMetricsRow
+              totalSessions={systemStatus.totalSessions}
+              activeAgents={systemStatus.activeAgents}
+              uptimeSeconds={systemStatus.uptimeSeconds}
+              totalSpend={heroCostQuery.data ?? '—'}
+              costError={heroCostQuery.isError}
+              onRetryCost={() => heroCostQuery.refetch()}
+            />
+          ) : null}
 
           {/* Inline widget controls — belongs with the grid, not the header */}
           <div className="mb-3 flex items-center justify-center gap-2 md:justify-end">
             <AddWidgetPopover visibleIds={visibleIds} onAdd={addWidget} />
+            {isMobile ? (
+              <button
+                type="button"
+                onClick={() => setMobileEditMode((previous) => !previous)}
+                className={cn(
+                  'inline-flex min-h-11 items-center gap-1 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-[11px] text-primary-600 transition-colors md:min-h-0 md:px-2.5 md:py-1',
+                  mobileEditMode
+                    ? 'border-accent-200 text-accent-600'
+                    : 'hover:border-accent-200 hover:text-accent-600',
+                )}
+                aria-label={mobileEditMode ? 'Finish widget edit mode' : 'Edit widgets'}
+                title={mobileEditMode ? 'Done editing' : 'Edit widgets'}
+              >
+                <HugeiconsIcon icon={DragDropIcon} size={18} strokeWidth={1.6} />
+                <span>{mobileEditMode ? 'Done' : 'Edit'}</span>
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={handleResetLayout}
@@ -639,99 +1043,59 @@ export function DashboardScreen() {
           <div ref={containerRef}>
             {isMobile ? (
               <div className="space-y-3">
-                {visibleIds.includes('skills') ? (
-                  <div key="skills" className="w-full">
-                    <CollapsibleWidget
-                      title="Skills"
-                      summary={`Skills: ${enabledSkillsCount} enabled`}
-                      defaultOpen={false}
+                {mobileSections.map((section, visibleIndex) => {
+                  const isDragging = mobileDragState?.activeId === section.id
+                  const translateY = getMobileItemTranslateY(visibleIndex)
+
+                  return (
+                    <motion.div
+                      key={section.id}
+                      layout
+                      animate={{ y: translateY, scale: isDragging ? 1.01 : 1 }}
+                      transition={{
+                        type: 'spring',
+                        stiffness: 420,
+                        damping: 36,
+                        mass: 0.5,
+                      }}
+                      className={cn(
+                        'w-full rounded-xl',
+                        mobileEditMode &&
+                          'border border-dashed border-primary-300/80 bg-primary-50/55 p-1.5',
+                        isDragging && 'z-20',
+                      )}
+                      style={{
+                        zIndex: isDragging ? 20 : 1,
+                        touchAction:
+                          mobileEditMode && isDragging ? 'none' : undefined,
+                      }}
+                      ref={(node) => {
+                        mobileItemRefs.current[section.id] = node
+                      }}
                     >
-                      <SkillsWidget onRemove={() => removeWidget('skills')} />
-                    </CollapsibleWidget>
-                  </div>
-                ) : null}
-                {visibleIds.includes('usage-meter') ? (
-                  <div key="usage-meter" className="w-full">
-                    <CollapsibleWidget
-                      title="Usage Meter"
-                      summary={usageSummary.text}
-                      defaultOpen={false}
-                      action={
-                        usageSummary.state === 'error' ? (
+                      {mobileEditMode ? (
+                        <div className="mb-1 flex items-center justify-end px-1">
                           <button
                             type="button"
-                            onClick={retryUsageSummary}
-                            className="rounded-md border border-red-200 bg-red-50/80 px-1.5 py-0.5 text-[10px] font-medium text-red-700 transition-colors hover:bg-red-100"
+                            onTouchStart={(event) =>
+                              handleWidgetTouchStart(event, visibleIndex, section.id)
+                            }
+                            onMouseDown={(event) => {
+                              event.preventDefault()
+                            }}
+                            className="inline-flex touch-none items-center gap-1 rounded-full border border-primary-200 bg-primary-100/80 px-2 py-0.5 text-[10px] font-medium text-primary-600 active:scale-95"
+                            aria-label={`Drag ${section.label}`}
+                            title={`Drag ${section.label}`}
                           >
-                            Retry
-                          </button>
-                        ) : null
-                      }
-                    >
-                      {usageSummary.state === 'error' ? (
-                        <div className="rounded-lg border border-red-200 bg-red-50/80 px-3 py-2 text-sm text-red-700">
-                          <p className="font-medium">Usage unavailable</p>
-                          <button
-                            type="button"
-                            onClick={retryUsageSummary}
-                            className="mt-2 rounded-md border border-red-200 bg-red-100/80 px-2 py-1 text-xs font-medium transition-colors hover:bg-red-100"
-                          >
-                            Retry
+                            <HugeiconsIcon icon={DragDropIcon} size={14} strokeWidth={1.6} />
+                            <span>Drag</span>
                           </button>
                         </div>
-                      ) : (
-                        <UsageMeterWidget
-                          onRemove={() => removeWidget('usage-meter')}
-                        />
-                      )}
-                    </CollapsibleWidget>
-                  </div>
-                ) : null}
-                {visibleIds.includes('tasks') ? (
-                  <div key="tasks" className="w-full">
-                    <CollapsibleWidget
-                      title="Tasks"
-                      summary={`Tasks: ${taskSummary.backlog} backlog • ${taskSummary.inProgress} in progress • ${taskSummary.done} done`}
-                      defaultOpen
-                    >
-                      <TasksWidget onRemove={() => removeWidget('tasks')} />
-                    </CollapsibleWidget>
-                  </div>
-                ) : null}
-                {visibleIds.includes('agent-status') ? (
-                  <div key="agent-status" className="w-full">
-                    <AgentStatusWidget
-                      onRemove={() => removeWidget('agent-status')}
-                    />
-                  </div>
-                ) : null}
-                {visibleIds.includes('recent-sessions') ? (
-                  <div key="recent-sessions" className="w-full">
-                    <RecentSessionsWidget
-                      onOpenSession={(sessionKey) =>
-                        navigate({
-                          to: '/chat/$sessionKey',
-                          params: { sessionKey },
-                        })
-                      }
-                      onRemove={() => removeWidget('recent-sessions')}
-                    />
-                  </div>
-                ) : null}
-                {visibleIds.includes('notifications') ? (
-                  <div key="notifications" className="w-full">
-                    <NotificationsWidget
-                      onRemove={() => removeWidget('notifications')}
-                    />
-                  </div>
-                ) : null}
-                {visibleIds.includes('activity-log') ? (
-                  <div key="activity-log" className="w-full">
-                    <ActivityLogWidget
-                      onRemove={() => removeWidget('activity-log')}
-                    />
-                  </div>
-                ) : null}
+                      ) : null}
+                      {section.content}
+                    </motion.div>
+                  )
+                })}
               </div>
             ) : containerWidth != null && containerWidth > 0 ? (
               <ResponsiveGridLayout

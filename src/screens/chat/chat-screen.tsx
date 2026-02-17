@@ -64,6 +64,7 @@ import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
+import { useTapDebug } from '@/hooks/use-tap-debug'
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -149,6 +150,7 @@ export function ChatScreen({
   const [isRedirecting, setIsRedirecting] = useState(false)
   const { headerRef, composerRef, mainRef, pinGroupMinHeight, headerHeight } =
     useChatMeasurements()
+  useTapDebug(mainRef, { label: 'chat-main' })
   const [waitingForResponse, setWaitingForResponse] = useState(
     () => hasPendingSend() || hasPendingGeneration(),
   )
