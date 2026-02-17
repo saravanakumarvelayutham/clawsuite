@@ -873,18 +873,16 @@ export function DashboardScreen() {
               {/* Left: Logo + name + status */}
               <div className="flex min-w-0 items-center gap-2.5">
                 {isMobile ? (
-                  <div className="relative shrink-0">
-                    <button
-                      type="button"
-                      onClick={handleLogoTap}
-                      className="cursor-pointer rounded-xl transition-transform active:scale-95"
-                      aria-label="Open quick menu"
-                    >
-                      <OpenClawStudioIcon className="size-8 rounded-xl shadow-sm" />
-                    </button>
+                  <button
+                    type="button"
+                    onClick={handleLogoTap}
+                    className="shrink-0 cursor-pointer rounded-xl transition-transform active:scale-95"
+                    aria-label="Open quick menu"
+                  >
+                    <OpenClawStudioIcon className="size-8 rounded-xl shadow-sm" />
                     {showLogoTip ? (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 -translate-x-1/2">
-                        <div className="relative rounded bg-primary-900 px-2 py-1 text-xs text-white shadow-sm">
+                      <div className="absolute !left-1/2 top-full z-30 mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-1 duratrion-300">
+                        <div className="relative rounded bg-primary-900 px-2 py-1 text-xs font-medium text-white shadow-md ">
                           <button
                             type="button"
                             className="whitespace-nowrap"
@@ -893,11 +891,11 @@ export function DashboardScreen() {
                           >
                             Tap for quick menu
                           </button>
-                          <div className="absolute left-1/2 top-0 size-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-primary-900" />
+                          <div className="absolute left-1/2 top-0 size-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-primary-900 shadow-md" />
                         </div>
                       </div>
                     ) : null}
-                  </div>
+                  </button>
                 ) : (
                   <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl shadow-sm" />
                 )}
