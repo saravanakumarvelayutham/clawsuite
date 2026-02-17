@@ -7,11 +7,13 @@ import {
   Settings01Icon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
+import { useLayoutEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import { hapticTap } from '@/lib/haptics'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 
 /** Height constant for consistent bottom insets on mobile routes with tab bar */
-export const MOBILE_TAB_BAR_OFFSET = '3.75rem'
+export const MOBILE_TAB_BAR_OFFSET = 'var(--tabbar-h, 3.75rem)'
 
 /**
  * Z-index layer map (documented for maintainability):
@@ -72,6 +74,7 @@ export function MobileTabBar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
   const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
+  const navRef = useRef<HTMLElement>(null)
   const isChatRoute =
     pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
 
@@ -79,10 +82,24 @@ export function MobileTabBar() {
   const keyboardActive = mobileKeyboardInset > 0 || mobileComposerFocused
   const hideTabBar = isChatRoute && keyboardActive
 
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    const measure = () => {
+      const height = navRef.current?.getBoundingClientRect().height ?? 0
+      if (height <= 0) return
+      root.style.setProperty('--tabbar-h', `${Math.ceil(height)}px`)
+    }
+
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
+
   return (
     <nav
+      ref={navRef}
       className={cn(
-        'fixed inset-x-0 bottom-0 z-40 isolate bg-primary-50/95 pb-[var(--safe-b)] md:hidden transition-all duration-200',
+        'fixed inset-x-0 bottom-0 z-40 isolate border-t border-primary-200/40 bg-primary-50/95 pb-[var(--safe-b)] md:hidden transition-all duration-200',
         hideTabBar
           ? 'translate-y-[110%] opacity-0 pointer-events-none'
           : 'translate-y-0 opacity-100',
@@ -97,7 +114,10 @@ export function MobileTabBar() {
             <button
               key={tab.id}
               type="button"
-              onClick={() => navigate({ to: tab.to })}
+              onClick={() => {
+                hapticTap()
+                void navigate({ to: tab.to })
+              }}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[10px] font-medium transition-transform duration-150 active:scale-90',

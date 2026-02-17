@@ -13,6 +13,7 @@ import { useNavigate } from '@tanstack/react-router'
 import {
   type MouseEvent,
   type ReactNode,
+  type TouchEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -97,6 +98,9 @@ type MobileWidgetSection = {
   label: string
   content: ReactNode
 }
+
+const PULL_REFRESH_THRESHOLD = 60
+const PULL_REFRESH_MAX_DISTANCE = 96
 
 function readNumeric(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -241,10 +245,18 @@ export function DashboardScreen() {
   const [isMobile, setIsMobile] = useState(false)
   const [mobileEditMode, setMobileEditMode] = useState(false)
   const [nowMs, setNowMs] = useState(() => Date.now())
-  const [mobileTipDismissed, setMobileTipDismissed] = useState(() => {
+  const [showLogoTip, setShowLogoTip] = useState(() => {
     if (typeof window === 'undefined') return false
-    return localStorage.getItem('dashboard-tip-dismissed') === 'true'
+    try {
+      return localStorage.getItem('clawsuite-logo-tip-seen') !== 'true'
+    } catch {
+      return false
+    }
   })
+  const [pullDistance, setPullDistance] = useState(0)
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false)
+  const pullStartRef = useRef<{ x: number; y: number } | null>(null)
+  const pullHorizontalRef = useRef(false)
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 767px)')
@@ -258,6 +270,17 @@ export function DashboardScreen() {
     const interval = window.setInterval(() => setNowMs(Date.now()), 60_000)
     return () => window.clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    if (!isMobile || !showLogoTip) return
+    const timeout = window.setTimeout(() => {
+      setShowLogoTip(false)
+      try {
+        localStorage.setItem('clawsuite-logo-tip-seen', 'true')
+      } catch {}
+    }, 4_000)
+    return () => window.clearTimeout(timeout)
+  }, [isMobile, showLogoTip])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -348,7 +371,7 @@ export function DashboardScreen() {
     refetchInterval: 60_000,
   })
 
-  const _handleRefreshAll = useCallback(
+  const handleRefreshAll = useCallback(
     async function handleRefreshAll() {
       await Promise.allSettled([
         sessionsQuery.refetch(),
@@ -504,10 +527,17 @@ export function DashboardScreen() {
       document.documentElement.classList.contains('dark'))
   const mobileThemeIcon = mobileThemeIsDark ? Moon02Icon : Sun02Icon
 
-  const dismissMobileTip = useCallback(function dismissMobileTip() {
-    setMobileTipDismissed(true)
-    localStorage.setItem('dashboard-tip-dismissed', 'true')
+  const markLogoTipSeen = useCallback(function markLogoTipSeen() {
+    setShowLogoTip(false)
+    try {
+      localStorage.setItem('clawsuite-logo-tip-seen', 'true')
+    } catch {}
   }, [])
+
+  const handleLogoTap = useCallback(function handleLogoTap() {
+    markLogoTipSeen()
+    setOverflowOpen(true)
+  }, [markLogoTipSeen])
 
   const retryUsageSummary = useCallback(
     function retryUsageSummary(event?: MouseEvent<HTMLButtonElement>) {
@@ -746,23 +776,128 @@ export function DashboardScreen() {
     [mobileSections, moveWidget, widgetOrder],
   )
 
+  const handlePullTouchStart = useCallback(
+    function handlePullTouchStart(event: TouchEvent<HTMLElement>) {
+      if (!isMobile || isPullRefreshing || event.touches.length === 0) return
+      if (event.currentTarget.scrollTop !== 0) {
+        pullStartRef.current = null
+        pullHorizontalRef.current = false
+        return
+      }
+
+      const touch = event.touches[0]
+      pullStartRef.current = { x: touch.clientX, y: touch.clientY }
+      pullHorizontalRef.current = false
+    },
+    [isMobile, isPullRefreshing],
+  )
+
+  const handlePullTouchMove = useCallback(
+    function handlePullTouchMove(event: TouchEvent<HTMLElement>) {
+      if (!isMobile || isPullRefreshing || event.touches.length === 0) return
+      const start = pullStartRef.current
+      if (!start) return
+
+      const touch = event.touches[0]
+      const deltaX = touch.clientX - start.x
+      const deltaY = touch.clientY - start.y
+
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        pullHorizontalRef.current = true
+      }
+      if (pullHorizontalRef.current) {
+        setPullDistance(0)
+        return
+      }
+      if (event.currentTarget.scrollTop > 0 || deltaY <= 0) {
+        setPullDistance(0)
+        return
+      }
+
+      const nextDistance = Math.min(
+        PULL_REFRESH_MAX_DISTANCE,
+        Math.max(0, deltaY * 0.5),
+      )
+      setPullDistance(nextDistance)
+      if (nextDistance > 0) event.preventDefault()
+    },
+    [isMobile, isPullRefreshing],
+  )
+
+  const handlePullTouchEnd = useCallback(
+    function handlePullTouchEnd() {
+      if (!isMobile) return
+      const shouldRefresh =
+        !pullHorizontalRef.current && pullDistance > PULL_REFRESH_THRESHOLD
+
+      pullStartRef.current = null
+      pullHorizontalRef.current = false
+      setPullDistance(0)
+
+      if (!shouldRefresh || isPullRefreshing) return
+      setIsPullRefreshing(true)
+      void handleRefreshAll().finally(() => setIsPullRefreshing(false))
+    },
+    [handleRefreshAll, isMobile, isPullRefreshing, pullDistance],
+  )
+
   return (
     <>
-      <main className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-3 pt-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 md:px-6 md:pt-8 md:pb-8">
+      <main
+        className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-3 pt-4 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 md:px-6 md:pt-8 md:pb-8"
+        onTouchStart={isMobile ? handlePullTouchStart : undefined}
+        onTouchMove={isMobile ? handlePullTouchMove : undefined}
+        onTouchEnd={isMobile ? handlePullTouchEnd : undefined}
+        onTouchCancel={isMobile ? handlePullTouchEnd : undefined}
+      >
+        {isMobile &&
+        (isPullRefreshing || pullDistance > PULL_REFRESH_THRESHOLD) ? (
+          <div className="pointer-events-none sticky top-1 z-30 mb-1 flex h-5 items-center justify-center">
+            <div
+              className={cn(
+                'size-4 rounded-full border-2 border-primary-300 border-t-accent-600',
+                (isPullRefreshing || pullDistance > PULL_REFRESH_THRESHOLD) &&
+                  'animate-spin',
+              )}
+              style={{
+                opacity: isPullRefreshing
+                  ? 1
+                  : Math.min(pullDistance / PULL_REFRESH_THRESHOLD, 1),
+              }}
+            />
+          </div>
+        ) : null}
         <section className="mx-auto w-full max-w-[1600px]">
           <header className="relative z-20 mb-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm md:mb-5 md:px-5 md:py-3">
             <div className="flex items-center justify-between gap-3">
               {/* Left: Logo + name + status */}
               <div className="flex min-w-0 items-center gap-2.5">
                 {isMobile ? (
-                  <button
-                    type="button"
-                    onClick={() => setOverflowOpen(true)}
-                    className="shrink-0 cursor-pointer rounded-xl transition-transform active:scale-95"
-                    aria-label="Open quick menu"
-                  >
-                    <OpenClawStudioIcon className="size-8 rounded-xl shadow-sm" />
-                  </button>
+                  <div className="relative shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleLogoTap}
+                      className="cursor-pointer rounded-xl transition-transform active:scale-95"
+                      aria-label="Open quick menu"
+                    >
+                      <OpenClawStudioIcon className="size-8 rounded-xl shadow-sm" />
+                    </button>
+                    {showLogoTip ? (
+                      <div className="absolute left-1/2 top-full z-30 mt-2 -translate-x-1/2">
+                        <div className="relative rounded bg-primary-900 px-2 py-1 text-xs text-white shadow-sm">
+                          <button
+                            type="button"
+                            className="whitespace-nowrap"
+                            onClick={markLogoTipSeen}
+                            aria-label="Dismiss quick menu tip"
+                          >
+                            Tap for quick menu
+                          </button>
+                          <div className="absolute left-1/2 top-0 size-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-primary-900" />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                 ) : (
                   <OpenClawStudioIcon className="size-8 shrink-0 rounded-xl shadow-sm" />
                 )}
