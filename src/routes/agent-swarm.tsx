@@ -12,6 +12,7 @@ import { IsometricOffice } from '@/components/agent-swarm/isometric-office'
 import { ActivityPanel } from '@/components/agent-swarm/activity-panel'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { useSounds } from '@/hooks/use-sounds'
+import { getSwarmSessionDisplayName } from '@/components/agent-swarm/session-display-name'
 
 export const Route = createFileRoute('/agent-swarm')({
   component: AgentSwarmRoute,
@@ -88,7 +89,8 @@ function SessionCard({ session }: { session: SwarmSession }) {
     session.key ?? session.friendlyId ?? 'unknown',
     taskText,
   )
-  const name = `${persona.emoji} ${persona.name}`
+  const displayName = getSwarmSessionDisplayName(session)
+  const personaName = `${persona.emoji} ${persona.name}`
   const role = persona.role
 
   return (
@@ -118,11 +120,16 @@ function SessionCard({ session }: { session: SwarmSession }) {
             </span>
           </div>
           <h3 className="mt-1 truncate text-sm font-semibold text-primary-900">
-            {name}
+            {displayName}
           </h3>
-          <span className={cn('text-xs font-medium', persona.color)}>
-            {role}
-          </span>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <span className="truncate text-[11px] text-primary-500">
+              {personaName}
+            </span>
+            <span className={cn('text-xs font-medium', persona.color)}>
+              {role}
+            </span>
+          </div>
         </div>
       </div>
 

@@ -82,16 +82,55 @@ function ChatHeaderComponent({
         ref={wrapperRef}
         className="shrink-0 border-b border-primary-200 px-4 h-12 flex items-center justify-between bg-surface"
       >
-        <div className="text-sm font-semibold tracking-tight text-ink">ClawSuite</div>
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          onClick={onOpenSessions}
-          className="h-10 w-10 text-primary-800 hover:bg-primary-100"
-          aria-label="Open sessions"
-        >
-          <HugeiconsIcon icon={ListViewIcon} size={20} strokeWidth={1.5} />
-        </Button>
+        <div className="flex min-w-0 items-center gap-2">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={onOpenSessions}
+            className="h-10 w-10 shrink-0 text-primary-800 hover:bg-primary-100"
+            aria-label="Open sessions"
+          >
+            <HugeiconsIcon icon={ListViewIcon} size={20} strokeWidth={1.5} />
+          </Button>
+          <div className="truncate text-sm font-semibold tracking-tight text-ink">
+            ClawSuite
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {syncLabel ? (
+            <span
+              className={cn(
+                'text-[11px] tabular-nums transition-colors',
+                isStale ? 'text-amber-500' : 'text-primary-400',
+              )}
+              title={
+                dataUpdatedAt > 0
+                  ? `Last synced: ${new Date(dataUpdatedAt).toLocaleTimeString()}`
+                  : undefined
+              }
+            >
+              {isStale ? '⚠ ' : ''}
+              {syncLabel}
+            </span>
+          ) : null}
+          {onRefresh ? (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              onClick={handleRefresh}
+              className="h-10 w-10 text-primary-500 hover:bg-primary-100 hover:text-primary-700"
+              aria-label="Refresh chat"
+            >
+              <HugeiconsIcon
+                icon={ReloadIcon}
+                size={20}
+                strokeWidth={1.5}
+                className={cn(isRefreshing && 'animate-spin')}
+              />
+            </Button>
+          ) : null}
+        </div>
       </div>
     )
   }

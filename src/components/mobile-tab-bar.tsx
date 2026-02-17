@@ -63,11 +63,9 @@ export function MobileTabBar() {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
-  const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
   const isChatRoute =
     pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
-  // Always hide on chat routes — composer occupies the bottom space
-  const hideForChat = isChatRoute
+  const hideForChat = isChatRoute && mobileKeyboardInset > 0
 
   return (
     <nav

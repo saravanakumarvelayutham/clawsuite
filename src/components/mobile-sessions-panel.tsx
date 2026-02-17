@@ -79,7 +79,7 @@ export function MobileSessionsPanel({
         onClick={onClose}
       />
 
-      <aside className="no-swipe absolute inset-y-0 right-0 w-[80vw] max-w-sm border-l border-primary-200 bg-white shadow-2xl animate-in slide-in-from-right-8 duration-200 dark:border-gray-700 dark:bg-gray-900">
+      <aside className="no-swipe absolute inset-y-0 left-0 w-[80vw] max-w-sm border-r border-primary-200 bg-white shadow-2xl animate-in slide-in-from-left-8 duration-200 dark:border-gray-700 dark:bg-gray-900">
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between border-b border-primary-200 px-4 py-3 dark:border-gray-700">
             <h2 className="text-sm font-semibold text-ink">Sessions</h2>
