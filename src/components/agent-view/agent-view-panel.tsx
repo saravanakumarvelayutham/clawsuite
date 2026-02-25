@@ -319,7 +319,32 @@ function OrchestratorCard({
   // Build usage rows: provider rows if available, else synthetic context row
   const ctxRow: OcUsageRow = { label: 'Ctx', pct: contextPct ?? 0, resetHint: null }
   const displayRows: OcUsageRow[] = usageRows.length > 0 ? usageRows : (contextPct !== null ? [ctxRow] : [])
-  const usageHeader = providerLabel ? `USAGE · ${providerLabel.toUpperCase()}` : 'USAGE'
+  const usageHeader = providerLabel ?? 'Usage'
+
+  // Provider logo mapping
+  const PROVIDER_LOGOS: Record<string, string> = {
+    'claude': '🟠',
+    'anthropic': '🟠',
+    'openai': '🟢',
+    'gemini': '🔵',
+    'google': '🔵',
+    'mistral': '🟡',
+    'groq': '⚡',
+    'ollama': '🦙',
+    'minimax': '🟣',
+    'deepseek': '🐋',
+    'cohere': '🔴',
+    'together': '🟤',
+  }
+  function getProviderLogo(label: string | null): string {
+    if (!label) return '◉'
+    const key = label.toLowerCase()
+    for (const [k, v] of Object.entries(PROVIDER_LOGOS)) {
+      if (key.includes(k)) return v
+    }
+    return '◉'
+  }
+  const providerLogo = getProviderLogo(providerLabel)
   const canCycleOc = allOcProviders.filter((p) => p.status === 'ok' && p.lines.length > 0).length > 1
 
   return (
@@ -377,7 +402,7 @@ function OrchestratorCard({
                 onClick={startEdit}
                 className={cn(
                   'font-semibold text-primary-900 transition-colors hover:text-accent-600',
-                  compact ? 'text-[11px]' : 'text-xs',
+                  compact ? 'text-sm' : 'text-base',
                 )}
                 title="Click to rename"
               >
@@ -401,57 +426,57 @@ function OrchestratorCard({
         </div>
       </div>
 
-      {/* ── Usage section — seamless inside the card ── */}
+      {/* ── Usage section ── */}
       {displayRows.length > 0 && (
-        <div className={cn('border-t border-primary-300/40 pt-2 space-y-1', compact ? 'mt-1.5 px-2' : 'mt-2 px-4')}>
-          {/* Header: provider name (click to cycle) | chevron (click to collapse) */}
+        <div className={cn('border-t border-primary-300/40 pt-2 space-y-1.5', compact ? 'mt-1.5 px-2' : 'mt-2 px-3')}>
+          {/* Provider header row */}
           <div className="flex w-full items-center justify-between">
             <button
               type="button"
               onClick={canCycleOc ? cycleOcProvider : undefined}
               className={cn(
-                'flex items-center gap-1 rounded px-1 text-[9px] font-semibold uppercase tracking-widest transition-colors',
+                'flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tracking-wide transition-colors',
                 canCycleOc
-                  ? 'cursor-pointer text-primary-400 hover:text-primary-600'
+                  ? 'cursor-pointer text-primary-500 hover:bg-primary-200/60 hover:text-primary-700'
                   : 'cursor-default text-primary-400',
-                providerFlash && 'text-emerald-500 ring-1 ring-accent-400',
+                providerFlash && 'text-emerald-500',
               )}
               title={canCycleOc ? 'Click to switch provider' : undefined}
             >
-              <span>{usageHeader}</span>
-              {canCycleOc && <span className="text-[8px] opacity-60">↻</span>}
+              <span className="text-sm leading-none">{providerLogo}</span>
+              <span className="capitalize">{usageHeader}</span>
+              {canCycleOc && <span className="text-[9px] opacity-50">↻</span>}
             </button>
             <button
               type="button"
               onClick={() => setUsageExpanded((v) => !v)}
-              className="text-[9px] text-primary-300 hover:text-primary-500 transition-colors cursor-pointer"
+              className="rounded p-0.5 text-[9px] text-primary-300 hover:text-primary-500 transition-colors cursor-pointer"
               aria-expanded={usageExpanded}
-              aria-label={usageExpanded ? 'Collapse usage' : 'Expand usage'}
             >
               {usageExpanded ? '▲' : '▼'}
             </button>
           </div>
 
           {usageExpanded && (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {displayRows.map((row) => (
-                <div key={row.label} className="flex items-center gap-1.5">
-                  <span className="w-12 shrink-0 text-[9px] text-primary-500 leading-none">
-                    {row.label}
-                  </span>
-                  <div className="h-1 flex-1 rounded-full bg-primary-200/70">
+                <div key={row.label} className="space-y-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-medium text-primary-500 leading-none">{row.label}</span>
+                    <span className={cn('text-[9px] tabular-nums font-semibold', ocTextColor(row.pct))}>
+                      {row.pct}%
+                    </span>
+                  </div>
+                  <div className="h-1 w-full rounded-full bg-primary-200/70">
                     <div
-                      className={cn('h-full rounded-full transition-all', ocBarColor(row.pct))}
+                      className={cn('h-full rounded-full transition-all duration-500', ocBarColor(row.pct))}
                       style={{ width: `${row.pct}%` }}
                     />
                   </div>
-                  <span className={cn('w-6 text-right text-[9px] tabular-nums', ocTextColor(row.pct))}>
-                    {row.pct}%
-                  </span>
                   {row.resetHint && (
-                    <span className="text-[8px] text-neutral-400 ml-1 shrink-0">
+                    <p className="text-[8px] text-primary-400/70 text-right leading-none">
                       {row.resetHint}
-                    </span>
+                    </p>
                   )}
                 </div>
               ))}
