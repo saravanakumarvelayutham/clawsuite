@@ -2,11 +2,11 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowUp02Icon,
+  BotIcon,
   Chat01Icon,
   Home01Icon,
   PuzzleIcon,
   Settings01Icon,
-  UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import type { TouchEvent } from 'react'
@@ -44,7 +44,7 @@ const TABS: TabItem[] = [
   {
     id: 'agents',
     label: 'Agent Hub',
-    icon: UserMultipleIcon,
+    icon: BotIcon,
     to: '/agent-swarm',
     match: (p) => p.startsWith('/agent-swarm') || p.startsWith('/agents'),
   },
@@ -138,14 +138,19 @@ export function MobileTabBar() {
       <nav
         ref={navRef}
         className={cn(
-          'fixed inset-x-0 bottom-0 z-40 isolate border-t border-gray-200/50 bg-white/95 pb-[max(var(--safe-b),env(safe-area-inset-bottom))] dark:border-gray-700/50 dark:bg-gray-950/95 md:hidden transition-all duration-200',
+          'fixed inset-x-0 bottom-0 z-40',
+          // Glass effect: frosted background + blur. No isolate — isolate breaks backdrop-filter on children.
+          'bg-white/80 backdrop-blur-xl dark:bg-neutral-900/80',
+          'border-t border-white/20 dark:border-white/10',
+          'pb-[max(var(--safe-b),env(safe-area-inset-bottom))]',
+          'md:hidden transition-all duration-200',
           hideTabBar
             ? 'translate-y-[110%] opacity-0 pointer-events-none'
             : 'translate-y-0 opacity-100',
         )}
         aria-label="Mobile navigation"
       >
-        <div className="mx-2 mb-0 grid grid-cols-5 gap-1 rounded-2xl border border-gray-200/70 px-1 py-1.5 shadow-[0_2px_20px_rgba(0,0,0,0.08)] dark:border-gray-700/70">
+        <div className="mx-2 mb-0 grid grid-cols-5 gap-1 rounded-2xl border border-white/30 dark:border-white/10 px-1 py-1.5 shadow-[0_4px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
           {TABS.map((tab) => {
             const isActive = tab.match(pathname)
             const isCenterChat = tab.id === 'chat'
@@ -159,7 +164,7 @@ export function MobileTabBar() {
                 }}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[10px] font-medium transition-transform duration-150 active:scale-90',
+                  'flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[10px] font-medium transition-transform duration-150 active:scale-90',
                   isCenterChat ? '-mt-2' : '',
                 )}
               >

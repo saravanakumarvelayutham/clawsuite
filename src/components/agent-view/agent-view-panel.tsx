@@ -6,7 +6,6 @@ import {
   ArrowRight01Icon,
   BotIcon,
   Cancel01Icon,
-  Link01Icon,
 } from '@hugeicons/core-free-icons'
 import { useNavigate } from '@tanstack/react-router'
 import {
@@ -107,6 +106,90 @@ const STATE_GLOW: Record<string, string> = {
   orchestrating: 'border-accent-400/50 shadow-[0_0_8px_rgba(249,115,22,0.2)]',
 }
 
+// ── Usage helpers (inline in OrchestratorCard) ─────────────────────────────
+
+const USAGE_POLL_MS = 30_000
+const PREFERRED_PROVIDER_KEY_OC = 'clawsuite-preferred-provider'
+
+type OcUsageLine = {
+  type: 'progress' | 'text' | 'badge'
+  label: string
+  used?: number
+  limit?: number
+  format?: 'percent' | 'dollars' | 'tokens'
+  value?: string
+  color?: string
+  resetsAt?: string
+}
+
+type OcProviderEntry = {
+  provider: string
+  displayName: string
+  status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
+  plan?: string
+  lines: Array<OcUsageLine>
+}
+
+type OcUsageRow = { label: string; pct: number; resetHint: string | null }
+
+function ocFormatResetHint(resetsAt?: string): string | null {
+  if (!resetsAt) return null
+  const now = Date.now()
+  const diff = new Date(resetsAt).getTime() - now
+  if (diff <= 0) return null
+  const hours = diff / 3_600_000
+  if (hours >= 24) {
+    const days = Math.ceil(hours / 24)
+    return `~${days}d`
+  }
+  return `~${Math.ceil(hours)}h`
+}
+
+function ocBarColor(pct: number): string {
+  if (pct >= 80) return 'bg-red-500'
+  if (pct >= 60) return 'bg-amber-400'
+  return 'bg-emerald-500'
+}
+function ocTextColor(pct: number): string {
+  if (pct >= 80) return 'text-red-500'
+  if (pct >= 60) return 'text-amber-500'
+  return 'text-emerald-600'
+}
+
+function ocReadNumber(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const p = Number(value)
+    if (Number.isFinite(p)) return p
+  }
+  return 0
+}
+
+function ocReadPercent(value: unknown): number {
+  const n = ocReadNumber(value)
+  if (n <= 1 && n > 0) return n * 100
+  return n
+}
+
+function ocParseContextPct(payload: unknown): number {
+  const root = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
+  const usage =
+    (root.today as Record<string, unknown> | undefined) ??
+    (root.usage as Record<string, unknown> | undefined) ??
+    (root.summary as Record<string, unknown> | undefined) ??
+    (root.totals as Record<string, unknown> | undefined) ??
+    root
+  return ocReadPercent(
+    (usage as Record<string, unknown>)?.contextPercent ??
+      (usage as Record<string, unknown>)?.context_percent ??
+      (usage as Record<string, unknown>)?.context ??
+      root?.contextPercent ??
+      root?.context_percent,
+  )
+}
+
+// ── OrchestratorCard ────────────────────────────────────────────────────────
+
 function OrchestratorCard({
   compact = false,
   cardRef,
@@ -118,35 +201,107 @@ function OrchestratorCard({
   const glowClass = STATE_GLOW[state] ?? STATE_GLOW.idle
 
   const [agentName, setAgentName] = useState(getStoredAgentName)
+  const [sessionName, setSessionName] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Fetch model from gateway
   const [model, setModel] = useState('')
+
+  // Usage state
+  const [contextPct, setContextPct] = useState<number | null>(null)
+  const [usageRows, setUsageRows] = useState<OcUsageRow[]>([])
+  const [providerLabel, setProviderLabel] = useState<string | null>(null)
+  const [usageExpanded, setUsageExpanded] = useState(true)
+  const [preferredProvider, setPreferredProvider] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    try { return window.localStorage.getItem(PREFERRED_PROVIDER_KEY_OC) } catch { return null }
+  })
+  const [allOcProviders, setAllOcProviders] = useState<OcProviderEntry[]>([])
+  const [providerFlash, setProviderFlash] = useState(false)
+  const flashTimerRefOc = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function getPrimaryProvider(all: OcProviderEntry[], preferred: string | null) {
+    if (preferred) {
+      const m = all.find((p) => p.provider === preferred && p.status === 'ok' && p.lines.length > 0)
+      if (m) return m
+    }
+    return all.find((p) => p.status === 'ok' && p.lines.length > 0) ?? null
+  }
+
+  function updateUsageRowsFromProviders(providers: OcProviderEntry[], preferred: string | null) {
+    const primary = getPrimaryProvider(providers, preferred)
+    if (!primary) return
+    const rows: OcUsageRow[] = primary.lines
+      .filter((l) => l.type === 'progress' && l.used !== undefined)
+      .slice(0, 2)
+      .map((l) => ({ label: l.label.replace(/\s*\([^)]*\)\s*$/, '').trim(), pct: Math.min(100, Math.round(l.used as number)), resetHint: ocFormatResetHint(l.resetsAt) }))
+    setUsageRows(rows)
+    const name = primary.displayName.split(' ')[0]
+    const lbl = primary.plan ? `${name} ${primary.plan}` : name
+    setProviderLabel(lbl.length > 14 ? name : lbl)
+  }
+
+  function cycleOcProvider() {
+    const okProviders = allOcProviders.filter((p) => p.status === 'ok' && p.lines.length > 0)
+    if (okProviders.length < 2) return
+    const currentIdx = okProviders.findIndex((p) => p.provider === preferredProvider)
+    const next = okProviders[(currentIdx + 1) % okProviders.length]
+    if (!next) return
+    setPreferredProvider(next.provider)
+    try { localStorage.setItem(PREFERRED_PROVIDER_KEY_OC, next.provider) } catch { /* noop */ }
+    updateUsageRowsFromProviders(allOcProviders, next.provider)
+    if (flashTimerRefOc.current) clearTimeout(flashTimerRefOc.current)
+    setProviderFlash(true)
+    flashTimerRefOc.current = setTimeout(() => setProviderFlash(false), 300)
+  }
+
   useEffect(() => {
     let cancelled = false
-    async function fetchModel() {
+    async function fetchAll() {
       try {
+        // session-status: model + context pct
         const res = await fetch('/api/session-status')
         if (!res.ok) return
         const data = await res.json()
         const payload = data.payload ?? data
         const m = payload.model ?? payload.currentModel ?? ''
         if (!cancelled && m) setModel(String(m))
-      } catch {
-        /* noop */
-      }
+        const sn = String(payload.sessionLabel ?? payload.sessionName ?? payload.name ?? payload.label ?? '')
+        if (!cancelled && sn) setSessionName(sn)
+        const pct = ocParseContextPct(payload)
+        if (!cancelled) setContextPct(Math.min(100, Math.round(pct)))
+      } catch { /* noop */ }
+
+      try {
+        // provider-usage: all bars
+        const res2 = await fetch('/api/provider-usage')
+        if (!res2.ok || cancelled) return
+        const data2 = await res2.json().catch(() => null) as {
+          ok?: boolean
+          providers?: Array<OcProviderEntry>
+        } | null
+        if (!data2?.providers || cancelled) return
+
+        if (!cancelled) {
+          setAllOcProviders(data2.providers)
+          updateUsageRowsFromProviders(data2.providers, preferredProvider)
+        }
+      } catch { /* noop */ }
     }
-    void fetchModel()
-    const timer = setInterval(fetchModel, 30_000)
+
+    void fetchAll()
+    const timer = setInterval(fetchAll, USAGE_POLL_MS)
     return () => {
       cancelled = true
       clearInterval(timer)
+      if (flashTimerRefOc.current) clearTimeout(flashTimerRefOc.current)
     }
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferredProvider])
 
-  const displayName = agentName || 'Agent'
+  const displayName = agentName || sessionName || 'Agent'
 
   function startEdit() {
     setEditValue(agentName)
@@ -158,12 +313,14 @@ function OrchestratorCard({
     const trimmed = editValue.trim()
     setAgentName(trimmed)
     setIsEditing(false)
-    try {
-      localStorage.setItem(AGENT_NAME_KEY, trimmed)
-    } catch {
-      /* noop */
-    }
+    try { localStorage.setItem(AGENT_NAME_KEY, trimmed) } catch { /* noop */ }
   }
+
+  // Build usage rows: provider rows if available, else synthetic context row
+  const ctxRow: OcUsageRow = { label: 'Ctx', pct: contextPct ?? 0, resetHint: null }
+  const displayRows: OcUsageRow[] = usageRows.length > 0 ? usageRows : (contextPct !== null ? [ctxRow] : [])
+  const usageHeader = providerLabel ? `USAGE · ${providerLabel.toUpperCase()}` : 'USAGE'
+  const canCycleOc = allOcProviders.filter((p) => p.status === 'ok' && p.lines.length > 0).length > 1
 
   return (
     <div
@@ -184,7 +341,14 @@ function OrchestratorCard({
           compact ? 'gap-2' : 'flex-col text-center gap-2',
         )}
       >
-        <OrchestratorAvatar size={compact ? 32 : 52} />
+        <div className="flex flex-col items-center gap-0.5">
+          <OrchestratorAvatar size={compact ? 32 : 52} />
+          {!compact ? (
+            <span className="rounded bg-accent-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent-700">
+              Main Agent
+            </span>
+          ) : null}
+        </div>
 
         <div className="min-w-0 flex-1">
           <div
@@ -212,18 +376,13 @@ function OrchestratorCard({
                 type="button"
                 onClick={startEdit}
                 className={cn(
-                  'font-semibold text-primary-900 hover:text-accent-600 transition-colors',
+                  'font-semibold text-primary-900 transition-colors hover:text-accent-600',
                   compact ? 'text-[11px]' : 'text-xs',
                 )}
                 title="Click to rename"
               >
                 {displayName}
               </button>
-            )}
-            {!compact && (
-              <span className="rounded-full bg-accent-500/15 px-1.5 py-0.5 text-[9px] font-medium text-accent-600">
-                Main Agent
-              </span>
             )}
           </div>
           <p
@@ -234,23 +393,76 @@ function OrchestratorCard({
           >
             {label}
           </p>
-          {!compact && model && (
+          {!compact && model ? (
             <p className="mt-0.5 truncate text-[9px] font-mono text-primary-500">
               {model}
             </p>
-          )}
+          ) : null}
         </div>
       </div>
+
+      {/* ── Usage section — seamless inside the card ── */}
+      {!compact && displayRows.length > 0 && (
+        <div className="mt-2 border-t border-primary-300/40 pt-2 px-4 space-y-1">
+          {/* Header: provider name (click to cycle) | chevron (click to collapse) */}
+          <div className="flex w-full items-center justify-between">
+            <button
+              type="button"
+              onClick={canCycleOc ? cycleOcProvider : undefined}
+              className={cn(
+                'flex items-center gap-1 rounded px-1 text-[9px] font-semibold uppercase tracking-widest transition-colors',
+                canCycleOc
+                  ? 'cursor-pointer text-primary-400 hover:text-primary-600'
+                  : 'cursor-default text-primary-400',
+                providerFlash && 'text-emerald-500 ring-1 ring-accent-400',
+              )}
+              title={canCycleOc ? 'Click to switch provider' : undefined}
+            >
+              <span>{usageHeader}</span>
+              {canCycleOc && <span className="text-[8px] opacity-60">↻</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => setUsageExpanded((v) => !v)}
+              className="text-[9px] text-primary-300 hover:text-primary-500 transition-colors cursor-pointer"
+              aria-expanded={usageExpanded}
+              aria-label={usageExpanded ? 'Collapse usage' : 'Expand usage'}
+            >
+              {usageExpanded ? '▲' : '▼'}
+            </button>
+          </div>
+
+          {usageExpanded && (
+            <div className="space-y-1">
+              {displayRows.map((row) => (
+                <div key={row.label} className="flex items-center gap-1.5">
+                  <span className="w-12 shrink-0 text-[9px] text-primary-500 leading-none">
+                    {row.label}
+                  </span>
+                  <div className="h-1 flex-1 rounded-full bg-primary-200/70">
+                    <div
+                      className={cn('h-full rounded-full transition-all', ocBarColor(row.pct))}
+                      style={{ width: `${row.pct}%` }}
+                    />
+                  </div>
+                  <span className={cn('w-6 text-right text-[9px] tabular-nums', ocTextColor(row.pct))}>
+                    {row.pct}%
+                  </span>
+                  {row.resetHint && (
+                    <span className="text-[8px] text-neutral-400 ml-1 shrink-0">
+                      {row.resetHint}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-function getHistoryPillClassName(status: 'success' | 'failed'): string {
-  if (status === 'failed') {
-    return 'border-red-500/50 bg-red-500/10 text-red-300'
-  }
-  return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-}
 
 function getStatusLabel(status: AgentNodeStatus): string {
   if (status === 'failed') return 'failed'
@@ -340,7 +552,7 @@ export function AgentViewPanel() {
     statusLabel: string
   } | null>(null)
   const [cliAgentsExpanded, setCliAgentsExpanded] = useState(true)
-  const [browserPreviewExpanded, setBrowserPreviewExpanded] = useState(true)
+  const [browserPreviewExpanded, setBrowserPreviewExpanded] = useState(false)
   const cliAgentsQuery = useCliAgents()
   const cliAgents = cliAgentsQuery.data ?? []
   // Auto: expanded avatar when idle, compact when agents are working
@@ -624,7 +836,7 @@ export function AgentViewPanel() {
           <ScrollAreaRoot className="h-[calc(100vh-3.25rem)]">
             <ScrollAreaViewport>
               <div className="space-y-3 p-3">
-                {/* Main Agent Card */}
+                {/* Main Agent Card (includes usage section) */}
                 <OrchestratorCard compact={viewMode === 'compact'} />
 
                 {/* Swarm — agent cards */}
@@ -755,9 +967,7 @@ export function AgentViewPanel() {
                             }}
                             className={cn(
                               'grid gap-1.5 items-start',
-                              viewMode === 'compact'
-                                ? 'grid-cols-2'
-                                : 'grid-cols-1',
+                              'grid-cols-1',
                             )}
                           >
                             <AnimatePresence mode="popLayout" initial={false}>
@@ -813,9 +1023,7 @@ export function AgentViewPanel() {
                               layout
                               className={cn(
                                 'grid gap-1.5 items-start',
-                                viewMode === 'compact'
-                                  ? 'grid-cols-2'
-                                  : 'grid-cols-1',
+                                'grid-cols-1',
                               )}
                             >
                               {queuedNodes.map(function renderQueuedNode(node) {
@@ -852,152 +1060,91 @@ export function AgentViewPanel() {
                   </LayoutGroup>
                 </section>
 
-                {/* History — only show when there are entries */}
-                {historyAgents.length > 0 ? (
+                {(cliAgentsQuery.isLoading || cliAgents.length > 0) ? (
                   <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
                     <Collapsible
-                      open={historyOpen}
-                      onOpenChange={setHistoryOpen}
+                      open={cliAgentsExpanded}
+                      onOpenChange={setCliAgentsExpanded}
                     >
                       <div className="flex items-center justify-between">
                         <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
                           <HugeiconsIcon
                             icon={
-                              historyOpen ? ArrowDown01Icon : ArrowRight01Icon
+                              cliAgentsExpanded
+                                ? ArrowDown01Icon
+                                : ArrowRight01Icon
                             }
                             size={20}
                             strokeWidth={1.5}
                           />
-                          History
+                          ⚡ CLI Agents
                         </CollapsibleTrigger>
                         <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
-                          {historyAgents.length}
+                          {cliAgents.length}
                         </span>
                       </div>
                       <CollapsiblePanel contentClassName="pt-1">
-                        <div className="flex flex-wrap gap-1.5">
-                          {historyAgents
-                            .slice(0, 10)
-                            .map(function renderHistoryPill(item) {
-                              return (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  className={cn(
-                                    'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] tabular-nums',
-                                    getHistoryPillClassName(item.status),
-                                  )}
-                                  onClick={function handleHistoryView() {
-                                    setOpen(false)
-                                    navigate({ to: '/agent-swarm' })
-                                  }}
-                                >
-                                  <HugeiconsIcon
-                                    icon={Link01Icon}
-                                    size={20}
-                                    strokeWidth={1.5}
+                        <div className="space-y-0.5">
+                          {cliAgentsQuery.isLoading ? (
+                            <p className="px-2 py-1 text-[11px] text-primary-500 tabular-nums">
+                              Scanning...
+                            </p>
+                          ) : null}
+                          {cliAgents.map(function renderCliAgent(agent) {
+                            const progressPct =
+                              agent.status === 'finished'
+                                ? 100
+                                : Math.min(
+                                    95,
+                                    Math.round(
+                                      (agent.runtimeSeconds / 600) * 100,
+                                    ),
+                                  )
+                            return (
+                              <div
+                                key={agent.pid}
+                                className="rounded-lg px-2 py-1.5 hover:bg-primary-200/50"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className={cn(
+                                      'size-1.5 shrink-0 rounded-full',
+                                      agent.status === 'running'
+                                        ? 'bg-emerald-500'
+                                        : 'bg-gray-400',
+                                    )}
                                   />
-                                  <span className="truncate">{item.name}</span>
-                                  <span className="opacity-80">
-                                    {formatCost(item.cost)}
+                                  <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary-800">
+                                    {agent.name}
                                   </span>
-                                </button>
-                              )
-                            })}
+                                  <span className="shrink-0 text-[10px] text-primary-500 tabular-nums">
+                                    {formatRuntimeLabel(agent.runtimeSeconds)}
+                                  </span>
+                                </div>
+                                {agent.task ? (
+                                  <p className="mt-0.5 truncate pl-3 text-[10px] text-primary-500">
+                                    {summarizeTask(agent.task)}
+                                  </p>
+                                ) : null}
+                                <div className="mt-1 ml-3 h-1 overflow-hidden rounded-full bg-primary-200">
+                                  <div
+                                    className={cn(
+                                      'h-full rounded-full transition-all duration-500',
+                                      agent.status === 'finished'
+                                        ? 'bg-primary-400'
+                                        : 'bg-emerald-400',
+                                    )}
+                                    style={{ width: `${progressPct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       </CollapsiblePanel>
                     </Collapsible>
                   </section>
                 ) : null}
-
-                <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
-                  <Collapsible
-                    open={cliAgentsExpanded}
-                    onOpenChange={setCliAgentsExpanded}
-                  >
-                    <div className="flex items-center justify-between">
-                      <CollapsibleTrigger className="h-7 px-0 text-xs font-medium hover:bg-transparent">
-                        <HugeiconsIcon
-                          icon={
-                            cliAgentsExpanded
-                              ? ArrowDown01Icon
-                              : ArrowRight01Icon
-                          }
-                          size={20}
-                          strokeWidth={1.5}
-                        />
-                        ⚡ CLI Agents
-                      </CollapsibleTrigger>
-                      <span className="rounded-full bg-primary-300/70 px-2 py-0.5 text-[11px] text-primary-800 tabular-nums">
-                        {cliAgents.length}
-                      </span>
-                    </div>
-                    <CollapsiblePanel contentClassName="pt-1">
-                      <div className="space-y-0.5">
-                        {cliAgentsQuery.isLoading ? (
-                          <p className="px-2 py-1 text-[11px] text-primary-500 tabular-nums">
-                            Scanning...
-                          </p>
-                        ) : null}
-                        {!cliAgentsQuery.isLoading && !cliAgents.length ? (
-                          <p className="px-2 py-1 text-[11px] text-primary-500">
-                            No agents running
-                          </p>
-                        ) : null}
-                        {cliAgents.map(function renderCliAgent(agent) {
-                          const progressPct =
-                            agent.status === 'finished'
-                              ? 100
-                              : Math.min(
-                                  95,
-                                  Math.round(
-                                    (agent.runtimeSeconds / 600) * 100,
-                                  ),
-                                )
-                          return (
-                            <div
-                              key={agent.pid}
-                              className="rounded-lg px-2 py-1.5 hover:bg-primary-200/50"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <span
-                                  className={cn(
-                                    'size-1.5 shrink-0 rounded-full',
-                                    agent.status === 'running'
-                                      ? 'bg-emerald-500'
-                                      : 'bg-gray-400',
-                                  )}
-                                />
-                                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary-800">
-                                  {agent.name}
-                                </span>
-                                <span className="shrink-0 text-[10px] text-primary-500 tabular-nums">
-                                  {formatRuntimeLabel(agent.runtimeSeconds)}
-                                </span>
-                              </div>
-                              {agent.task ? (
-                                <p className="mt-0.5 truncate pl-3 text-[10px] text-primary-500">
-                                  {summarizeTask(agent.task)}
-                                </p>
-                              ) : null}
-                              <div className="mt-1 ml-3 h-1 overflow-hidden rounded-full bg-primary-200">
-                                <div
-                                  className={cn(
-                                    'h-full rounded-full transition-all duration-500',
-                                    agent.status === 'finished'
-                                      ? 'bg-primary-400'
-                                      : 'bg-emerald-400',
-                                  )}
-                                  style={{ width: `${progressPct}%` }}
-                                />
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </CollapsiblePanel>
-                  </Collapsible>
-                </section>
 
                 <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-2">
                   <Collapsible
@@ -1015,7 +1162,7 @@ export function AgentViewPanel() {
                           size={20}
                           strokeWidth={1.5}
                         />
-                        🌐 Browser
+                        🌐 Browser {browserPreviewExpanded ? '' : '— inactive'}
                       </CollapsibleTrigger>
                     </div>
                     <CollapsiblePanel contentClassName="pt-1">
@@ -1092,6 +1239,7 @@ export function AgentViewPanel() {
                 {/* Content — same as desktop sidebar */}
                 <div className="space-y-3 p-3">
                   <OrchestratorCard compact={viewMode === 'compact'} />
+
                   <section className="rounded-2xl border border-primary-300/70 bg-primary-200/35 p-1">
                     <div className="mb-1 flex justify-center">
                       <span className="rounded-full border border-primary-300/70 bg-primary-100/80 px-3 py-0.5 text-[10px] font-medium text-primary-600 shadow-sm">

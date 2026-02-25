@@ -75,6 +75,9 @@ type GatewayChatState = {
   getRealtimeMessages: (sessionKey: string) => Array<GatewayMessage>
   getStreamingState: (sessionKey: string) => StreamingState | null
   clearSession: (sessionKey: string) => void
+  clearRealtimeBuffer: (sessionKey: string) => void
+  clearStreamingSession: (sessionKey: string) => void
+  clearAllStreaming: () => void
   mergeHistoryMessages: (
     sessionKey: string,
     historyMessages: Array<GatewayMessage>,
@@ -87,6 +90,50 @@ const createEmptyStreamingState = (): StreamingState => ({
   thinking: '',
   toolCalls: [],
 })
+
+function normalizeString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function getMessageId(msg: GatewayMessage | null | undefined): string | undefined {
+  if (!msg) return undefined
+  const id = (msg as { id?: string }).id
+  if (typeof id === 'string' && id.trim().length > 0) return id
+  const messageId = (msg as { messageId?: string }).messageId
+  if (typeof messageId === 'string' && messageId.trim().length > 0) return messageId
+  return undefined
+}
+
+function getClientNonce(msg: GatewayMessage | null | undefined): string {
+  if (!msg) return ''
+  const raw = msg as Record<string, unknown>
+  return (
+    normalizeString(raw.clientId) ||
+    normalizeString(raw.client_id) ||
+    normalizeString(raw.nonce) ||
+    normalizeString(raw.idempotencyKey)
+  )
+}
+
+function messageMultipartSignature(msg: GatewayMessage | null | undefined): string {
+  if (!msg) return ''
+  const content = Array.isArray(msg.content)
+    ? msg.content
+        .map((part) => {
+          if (part.type === 'text') return `t:${String((part as any).text ?? '').trim()}`
+          if (part.type === 'thinking') return `h:${String((part as any).thinking ?? '').trim()}`
+          if (part.type === 'toolCall') return `tc:${String((part as any).id ?? '')}:${String((part as any).name ?? '')}`
+          return `p:${String((part as any).type ?? '')}`
+        })
+        .join('|')
+    : ''
+  const attachments = Array.isArray((msg as any).attachments)
+    ? (msg as any).attachments
+        .map((attachment: any) => `${String(attachment?.name ?? '')}:${String(attachment?.size ?? '')}:${String(attachment?.contentType ?? '')}`)
+        .join('|')
+    : ''
+  return `${msg.role ?? 'unknown'}:${content}:${attachments}`
+}
 
 export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
   connectionState: 'disconnected',
@@ -107,32 +154,64 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     switch (event.type) {
       case 'message':
       case 'user_message': {
-        // Add a complete message to the realtime buffer
         const messages = new Map(state.realtimeMessages)
         const sessionMessages = [...(messages.get(sessionKey) ?? [])]
 
-        // Check for duplicates — by ID first, then exact content match (bug #7 fix)
-        const newId = (event.message as any).id || (event.message as any).messageId
-        const newText = extractTextFromContent(event.message.content)
-        const isDuplicate = sessionMessages.some((existing) => {
+        const newId = getMessageId(event.message)
+        const newClientNonce = getClientNonce(event.message)
+        const newMultipartSignature = messageMultipartSignature(event.message)
+
+        const optimisticIndex =
+          newClientNonce.length > 0
+            ? sessionMessages.findIndex((existing) => {
+                if (existing.role !== event.message.role) return false
+                const existingNonce = getClientNonce(existing)
+                if (existingNonce.length === 0 || existingNonce !== newClientNonce) {
+                  return false
+                }
+                return (
+                  normalizeString((existing as any).status) === 'sending' ||
+                  Boolean((existing as any).__optimisticId)
+                )
+              })
+            : -1
+
+        const duplicateIndex = sessionMessages.findIndex((existing) => {
           if (existing.role !== event.message.role) return false
-          // ID match (most reliable)
-          const existingId = (existing as any).id || (existing as any).messageId
+          const existingId = getMessageId(existing)
           if (newId && existingId && newId === existingId) return true
-          // Exact content match (no time-window fallback — was dropping valid messages)
-          if (newText && newText === extractTextFromContent(existing.content))
+
+          const existingNonce = getClientNonce(existing)
+          if (newClientNonce && existingNonce && newClientNonce === existingNonce) {
             return true
-          return false
+          }
+
+          return (
+            newMultipartSignature.length > 0 &&
+            newMultipartSignature === messageMultipartSignature(existing)
+          )
         })
 
-        if (!isDuplicate) {
-          // Mark user messages from external sources
-          const message: GatewayMessage = {
-            ...event.message,
-            __realtimeSource:
-              event.type === 'user_message' ? (event as any).source : undefined,
+        // Mark user messages from external sources
+        const incomingMessage: GatewayMessage = {
+          ...event.message,
+          __realtimeSource:
+            event.type === 'user_message' ? (event as any).source : undefined,
+          status: undefined,
+        }
+
+        if (optimisticIndex >= 0) {
+          sessionMessages[optimisticIndex] = {
+            ...sessionMessages[optimisticIndex],
+            ...incomingMessage,
           }
-          sessionMessages.push(message)
+          messages.set(sessionKey, sessionMessages)
+          set({ realtimeMessages: messages, lastEventAt: now })
+          break
+        }
+
+        if (duplicateIndex === -1) {
+          sessionMessages.push(incomingMessage)
           messages.set(sessionKey, sessionMessages)
           set({ realtimeMessages: messages, lastEventAt: now })
         }
@@ -141,63 +220,73 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
 
       case 'chunk': {
         const streamingMap = new Map(state.streamingState)
-        const streaming =
+        const prev =
           streamingMap.get(sessionKey) ?? createEmptyStreamingState()
 
         // Gateway sends full accumulated text with fullReplace=true
         // Replace entire text (default), or append if fullReplace is explicitly false
-        if (event.fullReplace === false) {
-          streaming.text += event.text
-        } else {
-          streaming.text = event.text
+        const next: StreamingState = {
+          ...prev,
+          text: event.fullReplace === false ? prev.text + event.text : event.text,
+          runId: event.runId ?? prev.runId,
         }
-        if (event.runId) streaming.runId = event.runId
 
-        streamingMap.set(sessionKey, streaming)
+        streamingMap.set(sessionKey, next)
         set({ streamingState: streamingMap, lastEventAt: now })
         break
       }
 
       case 'thinking': {
         const streamingMap = new Map(state.streamingState)
-        const streaming =
+        const prev =
           streamingMap.get(sessionKey) ?? createEmptyStreamingState()
+        const next: StreamingState = {
+          ...prev,
+          thinking: event.text,
+          runId: event.runId ?? prev.runId,
+        }
 
-        streaming.thinking = event.text
-        if (event.runId) streaming.runId = event.runId
-
-        streamingMap.set(sessionKey, streaming)
+        streamingMap.set(sessionKey, next)
         set({ streamingState: streamingMap, lastEventAt: now })
         break
       }
 
       case 'tool': {
         const streamingMap = new Map(state.streamingState)
-        const streaming =
+        const prev =
           streamingMap.get(sessionKey) ?? createEmptyStreamingState()
 
-        if (event.runId) streaming.runId = event.runId
-
-        const existingToolIndex = streaming.toolCalls.findIndex(
-          (tc) => tc.id === event.toolCallId,
+        const toolCallId =
+          event.toolCallId ??
+          `${event.name || 'tool'}-${event.runId || sessionKey}-${prev.toolCalls.length}`
+        const existingToolIndex = prev.toolCalls.findIndex(
+          (tc) => tc.id === toolCallId,
         )
 
+        let nextToolCalls = [...prev.toolCalls]
+
         if (existingToolIndex >= 0) {
-          streaming.toolCalls[existingToolIndex] = {
-            ...streaming.toolCalls[existingToolIndex],
+          nextToolCalls[existingToolIndex] = {
+            ...nextToolCalls[existingToolIndex],
             phase: event.phase,
             args: event.args,
           }
-        } else if (event.toolCallId) {
-          streaming.toolCalls.push({
-            id: event.toolCallId,
+        } else if (event.phase === 'calling' || event.phase === 'start') {
+          nextToolCalls.push({
+            id: toolCallId,
             name: event.name,
             phase: event.phase,
             args: event.args,
           })
         }
 
-        streamingMap.set(sessionKey, streaming)
+        const next: StreamingState = {
+          ...prev,
+          runId: event.runId ?? prev.runId,
+          toolCalls: nextToolCalls,
+        }
+
+        streamingMap.set(sessionKey, next)
         set({ streamingState: streamingMap, lastEventAt: now })
         break
       }
@@ -257,10 +346,10 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
 
           // Deduplicate: by ID or exact content only (bug #7 fix)
           const completeText = extractTextFromContent(completeMessage.content)
-          const completeId = (completeMessage as any).id || (completeMessage as any).messageId
+          const completeId = getMessageId(completeMessage)
           const isDuplicate = sessionMessages.some((existing) => {
             if (existing.role !== 'assistant') return false
-            const existingId = (existing as any).id || (existing as any).messageId
+            const existingId = getMessageId(existing)
             if (completeId && existingId && completeId === existingId) return true
             if (completeText && completeText === extractTextFromContent(existing.content)) return true
             return false
@@ -297,6 +386,24 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
     set({ realtimeMessages: messages, streamingState: streaming })
   },
 
+  clearRealtimeBuffer: (sessionKey) => {
+    const messages = new Map(get().realtimeMessages)
+    messages.delete(sessionKey)
+    set({ realtimeMessages: messages })
+  },
+
+  clearStreamingSession: (sessionKey) => {
+    const streaming = new Map(get().streamingState)
+    if (!streaming.has(sessionKey)) return
+    streaming.delete(sessionKey)
+    set({ streamingState: streaming })
+  },
+
+  clearAllStreaming: () => {
+    if (get().streamingState.size === 0) return
+    set({ streamingState: new Map() })
+  },
+
   mergeHistoryMessages: (sessionKey, historyMessages) => {
     const realtimeMessages = get().realtimeMessages.get(sessionKey) ?? []
 
@@ -306,32 +413,82 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
 
     // Find messages in realtime that aren't in history yet
     const newRealtimeMessages = realtimeMessages.filter((rtMsg) => {
-      const rtId = (rtMsg as { id?: string }).id
+      const rtId = getMessageId(rtMsg)
       const rtText = extractTextFromContent(rtMsg.content)
+      const rtNonce = getClientNonce(rtMsg)
+      const rtSignature = messageMultipartSignature(rtMsg)
 
       return !historyMessages.some((histMsg) => {
-        // First check: match by message id if both have one
-        const histId = (histMsg as { id?: string }).id
+        const histId = getMessageId(histMsg)
         if (rtId && histId && rtId === histId) {
           return true
         }
 
-        // Second check: match by text content + role (most reliable)
+        const histNonce = getClientNonce(histMsg)
+        if (rtNonce && histNonce && rtNonce === histNonce) {
+          return true
+        }
+
         if (histMsg.role === rtMsg.role && rtText) {
           const histText = extractTextFromContent(histMsg.content)
           if (histText === rtText) return true
         }
 
-        // Third check: removed time-window fallback (bug #7 — was dropping valid messages)
-        return false
+        // Bug 1 fix: treat an optimistic/sending history message with same
+        // role + text content as matching the incoming realtime message, even
+        // when the gateway doesn't echo back clientId (e.g. paste/image sends
+        // where nonce is absent on the SSE event). This prevents the realtime
+        // message from being appended alongside the optimistic copy already in
+        // the history cache.
+        const histRaw = histMsg as Record<string, unknown>
+        const histIsOptimistic =
+          normalizeString(histRaw.status) === 'sending' ||
+          normalizeString(histRaw.__optimisticId).length > 0
+
+        if (histIsOptimistic && histMsg.role === rtMsg.role) {
+          // Text-based match (plain text messages)
+          if (rtText) {
+            const histText = extractTextFromContent(histMsg.content)
+            if (histText === rtText) return true
+          }
+          // Attachment-based match for paste/image messages: compare
+          // attachment names + sizes, which survive round-trip to the gateway.
+          const rtAttachments = Array.isArray((rtMsg as any).attachments)
+            ? (rtMsg as any).attachments as Array<Record<string, unknown>>
+            : []
+          const histAttachments = Array.isArray((histMsg as any).attachments)
+            ? (histMsg as any).attachments as Array<Record<string, unknown>>
+            : []
+          if (
+            rtAttachments.length > 0 &&
+            rtAttachments.length === histAttachments.length
+          ) {
+            const rtSig = rtAttachments
+              .map(
+                (a) =>
+                  `${normalizeString(a.name)}:${String(a.size ?? '')}`,
+              )
+              .sort()
+              .join('|')
+            const histSig = histAttachments
+              .map(
+                (a) =>
+                  `${normalizeString(a.name)}:${String(a.size ?? '')}`,
+              )
+              .sort()
+              .join('|')
+            if (rtSig && rtSig === histSig) return true
+          }
+        }
+
+        return (
+          rtSignature.length > 0 &&
+          rtSignature === messageMultipartSignature(histMsg)
+        )
       })
     })
 
     if (newRealtimeMessages.length === 0) {
-      // History has caught up, clear realtime buffer
-      const messages = new Map(get().realtimeMessages)
-      messages.delete(sessionKey)
-      set({ realtimeMessages: messages })
       return historyMessages
     }
 

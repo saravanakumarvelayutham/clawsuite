@@ -40,15 +40,23 @@ import {
 import { useChatMeasurements } from './hooks/use-chat-measurements'
 import { useChatHistory } from './hooks/use-chat-history'
 import { useRealtimeChatHistory } from './hooks/use-realtime-chat-history'
+import { useSmoothStreamingText } from './hooks/use-smooth-streaming-text'
 import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
 import { useAutoSessionTitle } from './hooks/use-auto-session-title'
+import { useRenameSession } from './hooks/use-rename-session'
 import { ContextBar } from './components/context-bar'
+import {
+  addApproval,
+  loadApprovals,
+  saveApprovals,
+} from '@/screens/gateway/lib/approvals-store'
 import type {
   ChatComposerAttachment,
   ChatComposerHandle,
   ChatComposerHelpers,
 } from './components/chat-composer'
+import type { ApprovalRequest } from '@/screens/gateway/lib/approvals-store'
 import type { GatewayAttachment, GatewayMessage, SessionMeta } from './types'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
@@ -79,10 +87,78 @@ type ChatScreenProps = {
   compact?: boolean
 }
 
+function normalizeMimeType(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  return value.trim().toLowerCase()
+}
+
+function isImageMimeType(value: unknown): boolean {
+  const normalized = normalizeMimeType(value)
+  return normalized.startsWith('image/')
+}
+
+function readDataUrlMimeType(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const match = /^data:([^;,]+)[^,]*,/i.exec(value.trim())
+  return match?.[1]?.trim().toLowerCase() || ''
+}
+
+function stripDataUrlPrefix(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  const commaIndex = trimmed.indexOf(',')
+  if (trimmed.toLowerCase().startsWith('data:') && commaIndex >= 0) {
+    return trimmed.slice(commaIndex + 1).trim()
+  }
+  return trimmed
+}
+
 function normalizeMessageValue(value: unknown): string {
   if (typeof value !== 'string') return ''
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : ''
+}
+
+function messageFallbackSignature(message: GatewayMessage): string {
+  const raw = message as Record<string, unknown>
+  const timestamp = normalizeMessageValue(
+    typeof raw.timestamp === 'number' ? String(raw.timestamp) : raw.timestamp,
+  )
+
+  const contentParts = Array.isArray(message.content)
+    ? message.content
+        .map((part: any) => {
+          if (part.type === 'text') {
+            return `t:${typeof part.text === 'string' ? part.text.trim() : ''}`
+          }
+          if (part.type === 'thinking') {
+            return `th:${typeof (part as any).thinking === 'string' ? (part as any).thinking : ''}`
+          }
+          if (part.type === 'toolCall') {
+            const toolPart = part as any
+            return `tc:${toolPart.id ?? ''}:${toolPart.name ?? ''}`
+          }
+          return `p:${(part as any).type ?? ''}`
+        })
+        .join('|')
+    : ''
+
+  const attachments = Array.isArray(message.attachments)
+    ? message.attachments
+        .map((attachment) => {
+          const name = typeof attachment?.name === 'string' ? attachment.name : ''
+          const size = typeof attachment?.size === 'number' ? String(attachment.size) : ''
+          const type =
+            typeof attachment?.contentType === 'string'
+              ? attachment.contentType
+              : ''
+          return `${name}:${size}:${type}`
+        })
+        .join('|')
+    : ''
+
+  return `${message.role ?? 'unknown'}:${timestamp}:${contentParts}:${attachments}`
 }
 
 function getMessageClientId(message: GatewayMessage): string {
@@ -155,16 +231,27 @@ export function ChatScreen({
   const [waitingForResponse, setWaitingForResponse] = useState(
     () => hasPendingSend() || hasPendingGeneration(),
   )
+  const [liveToolActivity, setLiveToolActivity] = useState<
+    Array<{ name: string; timestamp: number }>
+  >([])
   const streamTimer = useRef<number | null>(null)
   const streamIdleTimer = useRef<number | null>(null)
+  const failsafeTimerRef = useRef<number | null>(null)
   const lastAssistantSignature = useRef('')
   const refreshHistoryRef = useRef<() => void>(() => {})
   const retriedQueuedMessageKeysRef = useRef(new Set<string>())
   const hasSeenGatewayDisconnectRef = useRef(false)
   const hadGatewayErrorRef = useRef(false)
+  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>(
+    [],
+  )
+  const [isCompacting, setIsCompacting] = useState(false)
 
   const pendingStartRef = useRef(false)
   const composerHandleRef = useRef<ChatComposerHandle | null>(null)
+  // BUG-4: idempotency guard — prevents duplicate sends on paste/attach double-fire
+  const lastSendKeyRef = useRef('')
+  const lastSendAtRef = useRef(0)
   const [fileExplorerCollapsed, setFileExplorerCollapsed] = useState(() => {
     if (typeof window === 'undefined') return true
     const stored = localStorage.getItem('clawsuite-file-explorer-collapsed')
@@ -182,6 +269,8 @@ export function ChatScreen({
   const terminalPanelHeight = useTerminalPanelStore(
     (state) => state.panelHeight,
   )
+  const { renameSession, renaming: renamingSessionTitle } = useRenameSession()
+
   const {
     sessionsQuery,
     sessions,
@@ -221,6 +310,8 @@ export function ChatScreen({
     isRealtimeStreaming,
     realtimeStreamingText,
     realtimeStreamingThinking,
+    completedStreamingText,
+    completedStreamingThinking,
     activeToolCalls,
   } = useRealtimeChatHistory({
       sessionKey: resolvedSessionKey || activeCanonicalKey,
@@ -232,13 +323,169 @@ export function ChatScreen({
         setWaitingForResponse(true)
         setPendingGeneration(true)
       }, []),
+      onApprovalRequest: useCallback((payload: Record<string, unknown>) => {
+        const gatewayApprovalId =
+          typeof payload.id === 'string'
+            ? payload.id
+            : typeof payload.approvalId === 'string'
+              ? payload.approvalId
+              : typeof payload.gatewayApprovalId === 'string'
+                ? payload.gatewayApprovalId
+                : ''
+
+        const currentApprovals = loadApprovals()
+        if (
+          gatewayApprovalId &&
+          currentApprovals.some((entry) => {
+            return (
+              entry.status === 'pending' &&
+              entry.gatewayApprovalId === gatewayApprovalId
+            )
+          })
+        ) {
+          setPendingApprovals(
+            currentApprovals.filter((entry) => entry.status === 'pending'),
+          )
+          return
+        }
+
+        const actionValue = payload.action ?? payload.tool ?? payload.command
+        const action =
+          typeof actionValue === 'string'
+            ? actionValue
+            : actionValue
+              ? JSON.stringify(actionValue)
+              : 'Tool call requires approval'
+        const contextValue = payload.context ?? payload.input ?? payload.args
+        const context =
+          typeof contextValue === 'string'
+            ? contextValue
+            : contextValue
+              ? JSON.stringify(contextValue)
+              : ''
+        const agentNameValue = payload.agentName ?? payload.agent ?? payload.source
+        const agentName =
+          typeof agentNameValue === 'string' && agentNameValue.trim().length > 0
+            ? agentNameValue
+            : 'Agent'
+        const agentIdValue = payload.agentId ?? payload.sessionKey ?? payload.source
+        const agentId =
+          typeof agentIdValue === 'string' && agentIdValue.trim().length > 0
+            ? agentIdValue
+            : 'gateway'
+
+        addApproval({
+          agentId,
+          agentName,
+          action,
+          context,
+          source: 'gateway',
+          gatewayApprovalId: gatewayApprovalId || undefined,
+        })
+        setPendingApprovals(loadApprovals().filter((entry) => entry.status === 'pending'))
+      }, []),
+      onCompactionStart: useCallback(() => {
+        setIsCompacting(true)
+      }, []),
+      onCompactionEnd: useCallback(() => {
+        setIsCompacting(false)
+      }, []),
     })
+
+  // Apply smooth character-reveal animation to the raw SSE text
+  const smoothRealtimeStreamingText = useSmoothStreamingText(
+    realtimeStreamingText,
+    isRealtimeStreaming,
+  )
+
+  // Keep activity stream open persistently — opens on mount so it's ready
+  // before the first tool call fires (avoids connection latency gap).
+  const waitingForResponseRef = useRef(waitingForResponse)
+  useEffect(() => { waitingForResponseRef.current = waitingForResponse }, [waitingForResponse])
+
+  useEffect(() => {
+    const events = new EventSource('/api/events')
+    const onActivity = (event: MessageEvent) => {
+      // Only populate pills while waiting — but connection stays warm always
+      if (!waitingForResponseRef.current) return
+      try {
+        const payload = JSON.parse(event.data) as {
+          type?: unknown
+          title?: unknown
+        }
+        if (payload.type !== 'tool' || typeof payload.title !== 'string') {
+          return
+        }
+        const name = payload.title
+          .replace(/^Tool activity:\s*/i, '')
+          .trim()
+        if (!name) return
+        setLiveToolActivity((prev) => {
+          const filtered = prev.filter((entry) => entry.name !== name)
+          return [{ name, timestamp: Date.now() }, ...filtered].slice(0, 5)
+        })
+      } catch {
+        // Ignore malformed activity events.
+      }
+    }
+    events.addEventListener('activity', onActivity)
+    return () => {
+      events.removeEventListener('activity', onActivity)
+      events.close()
+    }
+  }, []) // mount only — stays open for session lifetime
+
+  // Clear tool pills after response arrives (with brief delay so last pill is visible)
+  useEffect(() => {
+    if (waitingForResponse) return
+    const timer = window.setTimeout(() => setLiveToolActivity([]), 800)
+    return () => window.clearTimeout(timer)
+  }, [waitingForResponse])
+
+  useEffect(() => {
+    function checkApprovals() {
+      const all = loadApprovals()
+      setPendingApprovals(all.filter((entry) => entry.status === 'pending'))
+    }
+    checkApprovals()
+    const id = window.setInterval(checkApprovals, 2000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const resolvePendingApproval = useCallback(
+    async (approval: ApprovalRequest, status: 'approved' | 'denied') => {
+      const nextApprovals = loadApprovals().map((entry) => {
+        if (entry.id !== approval.id) return entry
+        return {
+          ...entry,
+          status,
+          resolvedAt: Date.now(),
+        }
+      })
+      saveApprovals(nextApprovals)
+      setPendingApprovals(
+        nextApprovals.filter((entry) => entry.status === 'pending'),
+      )
+      if (!approval.gatewayApprovalId) return
+
+      const endpoint =
+        status === 'approved'
+          ? `/api/approvals/${approval.gatewayApprovalId}/approve`
+          : `/api/approvals/${approval.gatewayApprovalId}/deny`
+      try {
+        await fetch(endpoint, { method: 'POST' })
+      } catch {
+        // Local resolution still succeeds when API endpoint is unavailable.
+      }
+    },
+    [],
+  )
 
   // Use realtime-merged messages for display (SSE + history)
   // Re-apply display filter to realtime messages
   const finalDisplayMessages = useMemo(() => {
     // Rebuild display filter on merged messages
-    return realtimeMessages.filter((msg) => {
+    const filtered = realtimeMessages.filter((msg) => {
       if (msg.role === 'user') {
         const text = textFromMessage(msg)
         if (text.startsWith('A subagent task')) return false
@@ -260,7 +507,111 @@ export function ChatScreen({
       }
       return false
     })
-  }, [realtimeMessages])
+    // Dedup: SSE + history merge can produce duplicates (optimistic + SSE).
+    // Prefer stable identifiers (id/messageId/clientId/nonce), then fallback signature.
+    // Bug 1 fix: also normalise clientId so that an optimistic message (key =
+    // "opt-<uuid>") and the server's confirmed copy (key = clientId "<uuid>")
+    // collapse to the same dedup slot, preferring the non-optimistic copy.
+    //
+    // Strategy:
+    //   1. Collect all candidate IDs, including extracting the bare UUID from
+    //      "__optimisticId" (strip the "opt-" prefix).
+    //   2. For each candidate key, mark it seen. The first message wins.
+    //   3. Before filtering, sort so that non-optimistic messages (server
+    //      confirmed, have a real .id) come before optimistic ones — this way
+    //      the server copy wins the dedup race.
+    const sortedForDedup = [...filtered].sort((a, b) => {
+      const aRaw = a as Record<string, unknown>
+      const bRaw = b as Record<string, unknown>
+      const aIsOptimistic =
+        normalizeMessageValue(aRaw.__optimisticId).startsWith('opt-') &&
+        !normalizeMessageValue(aRaw.id)
+      const bIsOptimistic =
+        normalizeMessageValue(bRaw.__optimisticId).startsWith('opt-') &&
+        !normalizeMessageValue(bRaw.id)
+      if (aIsOptimistic && !bIsOptimistic) return 1
+      if (!aIsOptimistic && bIsOptimistic) return -1
+      return 0
+    })
+    const seen = new Set<string>()
+    const dedupedSet = new Set<GatewayMessage>()
+    for (const msg of sortedForDedup) {
+      const raw = msg as Record<string, unknown>
+      const rawOptimisticId = normalizeMessageValue(raw.__optimisticId)
+      // Bare UUID from optimistic id — strips "opt-" prefix so that the
+      // optimistic and confirmed copies share the same dedup key.
+      const bareOptimisticUuid = rawOptimisticId.startsWith('opt-')
+        ? rawOptimisticId.slice(4)
+        : ''
+      const idCandidates = [
+        normalizeMessageValue(raw.id),
+        normalizeMessageValue(raw.messageId),
+        normalizeMessageValue(raw.clientId),
+        normalizeMessageValue(raw.client_id),
+        normalizeMessageValue(raw.nonce),
+        normalizeMessageValue(raw.idempotencyKey),
+        bareOptimisticUuid,
+        rawOptimisticId,
+      ].filter(Boolean)
+
+      const primaryKey =
+        idCandidates.length > 0
+          ? `${msg.role}:id:${idCandidates[0]}`
+          : `${msg.role}:fallback:${messageFallbackSignature(msg)}`
+
+      if (seen.has(primaryKey)) continue
+      seen.add(primaryKey)
+      // Register all candidate keys so later messages that share any ID are
+      // collapsed (handles the optimistic-nonce = server-clientId overlap).
+      for (const candidate of idCandidates.slice(1)) {
+        seen.add(`${msg.role}:id:${candidate}`)
+      }
+      dedupedSet.add(msg)
+    }
+    // Restore original order (filtered array order, not sort order).
+    const deduped = filtered.filter((msg) => dedupedSet.has(msg))
+
+    if (!isRealtimeStreaming) {
+      return deduped
+    }
+
+    const nextMessages = [...deduped]
+    const streamToolCalls = activeToolCalls.map((toolCall) => ({
+      ...toolCall,
+      phase: toolCall.phase,
+    }))
+
+    const streamingMsg = {
+      role: 'assistant',
+      content: [],
+      __optimisticId: 'streaming-current',
+      __streamingStatus: 'streaming',
+      __streamingText: realtimeStreamingText,
+      __streamingThinking: realtimeStreamingThinking,
+      __streamToolCalls: streamToolCalls,
+    } as GatewayMessage
+
+    const existingStreamIdx = nextMessages.findIndex(
+      (message) => message.__streamingStatus === 'streaming',
+    )
+
+    if (existingStreamIdx >= 0) {
+      nextMessages[existingStreamIdx] = {
+        ...nextMessages[existingStreamIdx],
+        ...streamingMsg,
+      }
+      return nextMessages
+    }
+
+    nextMessages.push(streamingMsg)
+    return nextMessages
+  }, [
+    activeToolCalls,
+    isRealtimeStreaming,
+    realtimeMessages,
+    realtimeStreamingText,
+    realtimeStreamingThinking,
+  ])
 
   // Derive streaming state from realtime SSE state (bug #2 fix)
   const derivedStreamingInfo = useMemo(() => {
@@ -298,11 +649,19 @@ export function ChatScreen({
   useEffect(() => {
     return () => {
       streamStop()
+      if (failsafeTimerRef.current) {
+        window.clearTimeout(failsafeTimerRef.current)
+        failsafeTimerRef.current = null
+      }
     }
   }, [streamStop])
 
   const streamFinish = useCallback(() => {
     streamStop()
+    if (failsafeTimerRef.current) {
+      window.clearTimeout(failsafeTimerRef.current)
+      failsafeTimerRef.current = null
+    }
     setPendingGeneration(false)
     setWaitingForResponse(false)
   }, [streamStop])
@@ -381,6 +740,7 @@ export function ChatScreen({
     enabled:
       !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
   })
+
 
   // Phase 4.1: Smart Model Suggestions
   const modelsQuery = useQuery({
@@ -723,6 +1083,21 @@ export function ChatScreen({
       id: attachment.id ?? crypto.randomUUID(),
     }))
 
+    // Inject text/file attachment content directly into the message body.
+    // Gateways reliably forward text in the message body; file attachments
+    // may be silently dropped for non-image types.
+    const textBlocks = normalizedAttachments
+      .filter((a) => {
+        const mime = normalizeMimeType(a.contentType ?? '') || readDataUrlMimeType(a.dataUrl ?? '')
+        return !isImageMimeType(mime) && (a.dataUrl ?? '').length > 0
+      })
+      .map((a) => {
+        const raw = a.dataUrl ?? ''
+        const content = raw.startsWith('data:') ? atob(raw.split(',')[1] ?? '') : raw
+        return `\n\n<attachment name="${a.name ?? 'file'}">\n${content}\n</attachment>`
+      })
+    const enrichedBody = body + textBlocks.join('')
+
     let optimisticClientId = existingClientId
     if (!skipOptimistic) {
       const { clientId, optimisticMessage } = createOptimisticMessage(
@@ -751,20 +1126,49 @@ export function ChatScreen({
 
     // Failsafe: clear waitingForResponse after 120s no matter what
     // Prevents infinite spinner if SSE/idle detection both fail
-    const failsafeTimer = window.setTimeout(() => {
+    if (failsafeTimerRef.current) {
+      window.clearTimeout(failsafeTimerRef.current)
+    }
+    failsafeTimerRef.current = window.setTimeout(() => {
       streamFinish()
     }, 120_000)
 
-    // Map to gateway-expected field names:
-    // gateway wants: mimeType, fileName, content (base64 without data: prefix)
-    const payloadAttachments = normalizedAttachments.map((attachment) => ({
-      id: attachment.id,
-      fileName: attachment.name,
-      mimeType: attachment.contentType,
-      type: attachment.contentType?.startsWith('image/') ? 'image' : 'file',
-      content: attachment.dataUrl?.replace(/^data:[^;]+;base64,/, '') ?? '',
-      size: attachment.size,
-    }))
+    // Send a compatibility shape for gateway attachment parsing.
+    // Different gateway/channel versions read different keys.
+    const payloadAttachments = normalizedAttachments.map((attachment) => {
+      const mimeType =
+        normalizeMimeType(attachment.contentType) ||
+        readDataUrlMimeType(attachment.dataUrl)
+      const isImage = isImageMimeType(mimeType)
+      // For text/file attachments, dataUrl holds raw text (not a base64 data URL).
+      // We must base64-encode it so the server can build a valid data: URI.
+      const rawDataUrl = attachment.dataUrl ?? ''
+      let encodedContent: string
+      let finalDataUrl: string
+      if (!isImage && !rawDataUrl.startsWith('data:')) {
+        encodedContent = btoa(unescape(encodeURIComponent(rawDataUrl)))
+        finalDataUrl = mimeType
+          ? `data:${mimeType};base64,${encodedContent}`
+          : `data:text/plain;base64,${encodedContent}`
+      } else {
+        encodedContent = stripDataUrlPrefix(rawDataUrl)
+        finalDataUrl = rawDataUrl
+      }
+      return {
+        id: attachment.id,
+        name: attachment.name,
+        fileName: attachment.name,
+        contentType: mimeType || undefined,
+        mimeType: mimeType || undefined,
+        mediaType: mimeType || undefined,
+        type: isImage ? 'image' : 'file',
+        content: encodedContent,
+        data: encodedContent,
+        base64: encodedContent,
+        dataUrl: finalDataUrl,
+        size: attachment.size,
+      }
+    })
 
     fetch('/api/send', {
       method: 'POST',
@@ -772,7 +1176,7 @@ export function ChatScreen({
       body: JSON.stringify({
         sessionKey,
         friendlyId,
-        message: body,
+        message: enrichedBody,
         attachments:
           payloadAttachments.length > 0 ? payloadAttachments : undefined,
         thinking: 'low',
@@ -797,10 +1201,17 @@ export function ChatScreen({
           if (import.meta.env.DEV)
             console.warn('[chat] streamStart error (non-fatal):', e)
         }
+        if (failsafeTimerRef.current) {
+          window.clearTimeout(failsafeTimerRef.current)
+          failsafeTimerRef.current = null
+        }
         setSending(false)
       })
       .catch((err: unknown) => {
-        window.clearTimeout(failsafeTimer)
+        if (failsafeTimerRef.current) {
+          window.clearTimeout(failsafeTimerRef.current)
+          failsafeTimerRef.current = null
+        }
         setSending(false)
         const messageText = err instanceof Error ? err.message : String(err)
         if (isMissingGatewayAuth(messageText)) {
@@ -1040,6 +1451,16 @@ export function ChatScreen({
     ) => {
       const trimmedBody = body.trim()
       if (trimmedBody.length === 0 && attachments.length === 0) return
+
+      // BUG-4 fix: idempotency guard — deduplicate sends with identical content
+      // within a 500ms window. This prevents double-fire from paste events that
+      // simultaneously trigger onChange + onSubmit, or events that bubble twice.
+      const sendKey = `${trimmedBody}|${attachments.map((a) => `${a.name}:${a.size}`).join(',')}`
+      const now = Date.now()
+      if (sendKey === lastSendKeyRef.current && now - lastSendAtRef.current < 500) return
+      lastSendKeyRef.current = sendKey
+      lastSendAtRef.current = now
+
       helpers.reset()
 
       const attachmentPayload: Array<GatewayAttachment> = attachments.map(
@@ -1178,11 +1599,32 @@ export function ChatScreen({
         ? 'disconnected'
         : 'connecting'
 
+  const activeHeaderToolName =
+    liveToolActivity[0]?.name || activeToolCalls[0]?.name || undefined
+  const headerStatusMode: 'idle' | 'sending' | 'streaming' | 'tool' =
+    activeHeaderToolName
+      ? 'tool'
+      : derivedStreamingInfo.isStreaming
+        ? 'streaming'
+        : sending || waitingForResponse
+          ? 'sending'
+          : 'idle'
+
   // Pull-to-refresh offset removed
 
   const handleOpenAgentDetails = useCallback(() => {
     setAgentViewOpen(true)
   }, [setAgentViewOpen])
+
+  const handleRenameActiveSessionTitle = useCallback(
+    async (nextTitle: string) => {
+      const sessionKey =
+        resolvedSessionKey || activeSession?.key || activeSessionKey || ''
+      if (!sessionKey) return
+      await renameSession(sessionKey, activeSession?.friendlyId ?? null, nextTitle)
+    },
+    [activeSession?.friendlyId, activeSession?.key, activeSessionKey, renameSession, resolvedSessionKey],
+  )
 
   // Listen for mobile header agent-details tap
   useEffect(() => {
@@ -1195,14 +1637,14 @@ export function ChatScreen({
     <div
       className={cn(
         'relative min-w-0 flex flex-col overflow-hidden',
-        compact ? 'flex-1 min-h-0' : 'h-full',
+        compact ? 'h-full flex-1 min-h-0' : 'h-full',
       )}
     >
       <div
         className={cn(
           'flex-1 min-h-0 overflow-hidden',
           compact
-            ? 'flex flex-col w-full'
+            ? 'flex min-h-0 w-full flex-col'
             : isMobile
               ? 'flex flex-col'
               : 'grid grid-cols-[auto_1fr] grid-rows-[minmax(0,1fr)]',
@@ -1230,6 +1672,8 @@ export function ChatScreen({
           {!compact && (
             <ChatHeader
               activeTitle={activeTitle}
+              onRenameTitle={handleRenameActiveSessionTitle}
+              renamingTitle={renamingSessionTitle}
               wrapperRef={headerRef}
               onOpenSessions={() => setSessionsOpen(true)}
               showFileExplorerButton={!isMobile}
@@ -1241,12 +1685,67 @@ export function ChatScreen({
               agentConnected={mobileHeaderStatus === 'connected'}
               onOpenAgentDetails={handleOpenAgentDetails}
               pullOffset={0}
+              statusMode={headerStatusMode}
+              activeToolName={activeHeaderToolName}
             />
           )}
 
           <ContextBar compact={compact} />
 
+          {isCompacting && (
+            <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300">
+              <span className="animate-spin">⚙️</span>
+              <span>Compacting context — summarizing older messages...</span>
+            </div>
+          )}
+
           {gatewayNotice && <div className="sticky top-0 z-20 px-4 py-2">{gatewayNotice}</div>}
+          {pendingApprovals.length > 0 && (
+            <div className="mx-4 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-900/15">
+              <div className="space-y-2">
+                {pendingApprovals.map((approval) => (
+                  <div
+                    key={approval.id}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                        {'\uD83D\uDD10'} Approval Required - {approval.agentName || 'Agent'}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-amber-600 dark:text-amber-500">
+                        {approval.action}
+                      </p>
+                      {approval.context ? (
+                        <p className="mt-0.5 truncate text-[10px] font-mono text-amber-500 dark:text-amber-600">
+                          {approval.context.slice(0, 100)}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void resolvePendingApproval(approval, 'approved')
+                        }}
+                        className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void resolvePendingApproval(approval, 'denied')
+                        }}
+                        className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 dark:border-red-800/50 dark:bg-red-900/10 dark:text-red-400"
+                      >
+                        Deny
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {hideUi ? null : (
             <ChatMessageList
@@ -1275,16 +1774,25 @@ export function ChatScreen({
               keyboardInset={mobileKeyboardInset}
               isStreaming={derivedStreamingInfo.isStreaming}
               streamingMessageId={derivedStreamingInfo.streamingMessageId}
-              streamingText={realtimeStreamingText || undefined}
-              streamingThinking={realtimeStreamingThinking || undefined}
+              streamingText={
+                smoothRealtimeStreamingText ||
+                completedStreamingText.current ||
+                undefined
+              }
+              streamingThinking={
+                realtimeStreamingThinking ||
+                completedStreamingThinking.current ||
+                undefined
+              }
               hideSystemMessages={isMobile}
               activeToolCalls={activeToolCalls}
+              liveToolActivity={liveToolActivity}
             />
           )}
           {showComposer ? (
             <ChatComposer
               onSubmit={send}
-              isLoading={sending}
+              isLoading={sending || waitingForResponse}
               disabled={sending || hideUi}
               sessionKey={
                 isNewChat

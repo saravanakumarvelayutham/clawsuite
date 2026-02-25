@@ -3,10 +3,12 @@ import path from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { z } from 'zod'
+import { isAuthenticated } from '../../../server/auth-middleware'
 import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
+  requireJsonContentType,
   safeErrorMessage,
 } from '../../../server/rate-limit'
 
@@ -57,6 +59,12 @@ export const Route = createFileRoute('/api/tasks/')({
       },
 
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+
         const ip = getClientIp(request)
         if (!rateLimit(`tasks-post:${ip}`, 30, 60_000))
           return rateLimitResponse()

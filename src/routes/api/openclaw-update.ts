@@ -1,6 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../server/gateway'
+import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 type VersionCheckResult = {
   currentVersion: string
@@ -124,7 +131,18 @@ export const Route = createFileRoute('/api/openclaw-update')({
         }
       },
 
-      POST: async () => {
+      POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        const ip = getClientIp(request)
+        // openclaw-update POST triggers gateway update + restart — strict rate limit
+        if (!rateLimit(`openclaw-update-post:${ip}`, 10, 60_000)) {
+          return rateLimitResponse()
+        }
+
         try {
           // Re-check install type before attempting update
           const check = await checkOpenClawVersion()

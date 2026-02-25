@@ -1,13 +1,11 @@
-import { memo, useCallback, useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Folder01Icon,
-  ReloadIcon,
 } from '@hugeicons/core-free-icons'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { OrchestratorAvatar } from '@/components/orchestrator-avatar'
 import { Button } from '@/components/ui/button'
-import { UsageMeter } from '@/components/usage-meter'
 import {
   TooltipContent,
   TooltipProvider,
@@ -66,17 +64,11 @@ function formatMobileSessionTitle(rawTitle: string): string {
   return title
 }
 
-function formatSyncAge(updatedAt: number): string {
-  if (updatedAt <= 0) return ''
-  const seconds = Math.round((Date.now() - updatedAt) / 1000)
-  if (seconds < 5) return 'just now'
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.round(seconds / 60)
-  return `${minutes}m ago`
-}
 
 type ChatHeaderProps = {
   activeTitle: string
+  onRenameTitle?: (nextTitle: string) => Promise<void> | void
+  renamingTitle?: boolean
   wrapperRef?: React.Ref<HTMLDivElement>
   onOpenSessions?: () => void
   showFileExplorerButton?: boolean
@@ -94,10 +86,14 @@ type ChatHeaderProps = {
   onOpenAgentDetails?: () => void
   /** Pull-to-refresh offset in px — header slides down */
   pullOffset?: number
+  statusMode?: 'idle' | 'sending' | 'streaming' | 'tool'
+  activeToolName?: string
 }
 
 function ChatHeaderComponent({
   activeTitle,
+  onRenameTitle,
+  renamingTitle = false,
   wrapperRef,
   onOpenSessions,
   showFileExplorerButton = false,
@@ -109,18 +105,15 @@ function ChatHeaderComponent({
   agentConnected = true,
   onOpenAgentDetails,
   pullOffset = 0,
+  statusMode = 'idle',
+  activeToolName,
 }: ChatHeaderProps) {
-  const [syncLabel, setSyncLabel] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-
-  useEffect(() => {
-    if (dataUpdatedAt <= 0) return
-    const update = () => setSyncLabel(formatSyncAge(dataUpdatedAt))
-    update()
-    const id = setInterval(update, 5000)
-    return () => clearInterval(id)
-  }, [dataUpdatedAt])
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState(activeTitle)
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
+  const isSavingTitleRef = useRef(false)
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 767px)')
@@ -132,7 +125,7 @@ function ChatHeaderComponent({
 
   const isStale = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt > 15000
   const mobileTitle = formatMobileSessionTitle(activeTitle)
-  void _agentModel; void agentConnected // kept for prop compat
+  void _agentModel; void agentConnected; void statusMode; void activeToolName // kept for prop compat
 
   const handleRefresh = useCallback(() => {
     if (!onRefresh) return
@@ -149,36 +142,88 @@ function ChatHeaderComponent({
     window.dispatchEvent(new CustomEvent('clawsuite:chat-agent-details'))
   }, [onOpenAgentDetails])
 
+  useEffect(() => {
+    if (isEditingTitle) return
+    setTitleDraft(activeTitle)
+  }, [activeTitle, isEditingTitle])
+
+  useEffect(() => {
+    if (!isEditingTitle) return
+    const id = window.setTimeout(() => {
+      titleInputRef.current?.focus()
+      titleInputRef.current?.select()
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [isEditingTitle])
+
+  const canRenameTitle = Boolean(onRenameTitle && !isMobile)
+
+  const startTitleEdit = useCallback(() => {
+    if (!canRenameTitle || renamingTitle) return
+    setTitleDraft(activeTitle)
+    setIsEditingTitle(true)
+  }, [activeTitle, canRenameTitle, renamingTitle])
+
+  const cancelTitleEdit = useCallback(() => {
+    setTitleDraft(activeTitle)
+    setIsEditingTitle(false)
+  }, [activeTitle])
+
+  const saveTitleEdit = useCallback(async () => {
+    if (!onRenameTitle || isSavingTitleRef.current) return
+
+    const trimmed = titleDraft.trim()
+    if (!trimmed) {
+      cancelTitleEdit()
+      return
+    }
+
+    if (trimmed === activeTitle.trim()) {
+      setIsEditingTitle(false)
+      return
+    }
+
+    isSavingTitleRef.current = true
+    try {
+      await onRenameTitle(trimmed)
+      setIsEditingTitle(false)
+    } finally {
+      isSavingTitleRef.current = false
+    }
+  }, [activeTitle, cancelTitleEdit, onRenameTitle, titleDraft])
+
   if (isMobile) {
     return (
       <div
         ref={wrapperRef}
-        className="shrink-0 border-b border-primary-200 px-4 h-12 flex items-center justify-between bg-surface transition-transform"
+        className="shrink-0 border-b border-primary-200 bg-surface transition-transform"
         style={pullOffset > 0 ? { transform: `translateY(${pullOffset}px)` } : undefined}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <button
-            type="button"
-            onClick={onOpenSessions}
-            className="shrink-0 rounded-lg transition-transform active:scale-95"
-            aria-label="Open sessions"
-          >
-            <OpenClawStudioIcon className="size-8 rounded-lg" />
-          </button>
-          <div className="min-w-0 max-w-[45vw] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold tracking-tight text-ink">
-            {mobileTitle}
+        <div className="px-4 h-12 flex items-center justify-between">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <button
+              type="button"
+              onClick={onOpenSessions}
+              className="shrink-0 min-h-11 min-w-11 rounded-lg transition-transform active:scale-95"
+              aria-label="Open sessions"
+            >
+              <OpenClawStudioIcon className="size-8 rounded-lg" />
+            </button>
+            <div className="min-w-0 max-w-[45vw] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold tracking-tight text-ink">
+              {mobileTitle}
+            </div>
           </div>
-        </div>
 
-        <div className="ml-2 flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={handleOpenAgentDetails}
-            className="relative rounded-full transition-transform active:scale-90"
-            aria-label="Open agent details"
-          >
-            <OrchestratorAvatar size={28} compact />
-          </button>
+          <div className="ml-2 flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={handleOpenAgentDetails}
+              className="relative min-h-11 min-w-11 rounded-full transition-transform active:scale-90"
+              aria-label="Open agent details"
+            >
+              <OrchestratorAvatar size={28} compact />
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -187,84 +232,122 @@ function ChatHeaderComponent({
   return (
     <div
       ref={wrapperRef}
-      className="shrink-0 border-b border-primary-200 px-4 h-12 flex items-center bg-surface"
+      className="shrink-0 border-b border-primary-200 bg-surface"
     >
-      {showFileExplorerButton ? (
-        <TooltipProvider>
-          <TooltipRoot>
-            <TooltipTrigger
-              onClick={onToggleFileExplorer}
-              render={
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="mr-2 text-primary-800 hover:bg-primary-100"
-                  aria-label={
-                    fileExplorerCollapsed ? 'Show files' : 'Hide files'
-                  }
-                >
-                  <HugeiconsIcon
-                    icon={Folder01Icon}
-                    size={20}
-                    strokeWidth={1.5}
-                  />
-                </Button>
+      <div className="px-4 h-12 flex items-center">
+        {showFileExplorerButton ? (
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                onClick={onToggleFileExplorer}
+                render={
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className="mr-2 text-primary-800 hover:bg-primary-100 dark:hover:bg-primary-800"
+                    aria-label={
+                      fileExplorerCollapsed ? 'Show files' : 'Hide files'
+                    }
+                  >
+                    <HugeiconsIcon
+                      icon={Folder01Icon}
+                      size={20}
+                      strokeWidth={1.5}
+                    />
+                  </Button>
+                }
+              />
+              <TooltipContent side="bottom">
+                {fileExplorerCollapsed ? 'Show files' : 'Hide files'}
+              </TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+        ) : null}
+        <div className="group min-w-0 flex-1">
+        {isEditingTitle ? (
+          <input
+            ref={titleInputRef}
+            value={titleDraft}
+            disabled={renamingTitle}
+            onChange={(event) => setTitleDraft(event.target.value)}
+            onBlur={() => {
+              void saveTitleEdit()
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                void saveTitleEdit()
+                return
               }
-            />
-            <TooltipContent side="bottom">
-              {fileExplorerCollapsed ? 'Show files' : 'Hide files'}
-            </TooltipContent>
-          </TooltipRoot>
-        </TooltipProvider>
-      ) : null}
-      <div
-        className="min-w-0 flex-1 truncate text-sm font-medium text-balance"
-        suppressHydrationWarning
-      >
-        {activeTitle}
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                cancelTitleEdit()
+              }
+            }}
+            className="h-7 w-full min-w-0 border-b border-transparent bg-transparent px-0 text-sm font-medium text-balance text-ink outline-none transition-colors focus:border-primary-300"
+            aria-label="Session name"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={startTitleEdit}
+            disabled={!canRenameTitle || renamingTitle}
+            className="flex max-w-full items-center gap-1.5 rounded-sm text-left"
+            aria-label="Rename session"
+            title={canRenameTitle ? 'Click to rename session' : undefined}
+          >
+            <span
+              className="min-w-0 truncate text-sm font-medium text-balance"
+              suppressHydrationWarning
+            >
+              {activeTitle}
+            </span>
+            <span
+              aria-hidden
+              className="text-xs text-primary-400 opacity-0 transition-opacity group-hover:opacity-100"
+            >
+              ✏️
+            </span>
+          </button>
+        )}
       </div>
-      {syncLabel ? (
+      {renamingTitle ? (
         <span
-          className={cn(
-            'mr-1 text-[11px] tabular-nums transition-colors',
-            isStale ? 'text-amber-500' : 'text-primary-400',
-          )}
-          title={
-            dataUpdatedAt > 0
-              ? `Last synced: ${new Date(dataUpdatedAt).toLocaleTimeString()}`
-              : undefined
-          }
-        >
-          {isStale ? '⚠ ' : ''}
-          {syncLabel}
-        </span>
+          className="mr-1 inline-flex size-3 animate-spin rounded-full border border-primary-300 border-t-primary-700"
+          aria-label="Saving session name"
+        />
       ) : null}
-      {onRefresh ? (
-        <TooltipProvider>
-          <TooltipRoot>
-            <TooltipTrigger
-              onClick={handleRefresh}
-              render={
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="mr-1 text-primary-500 hover:bg-primary-100 hover:text-primary-700"
-                  aria-label="Refresh chat"
-                >
-                  <HugeiconsIcon
-                    icon={ReloadIcon}
-                    size={20}
-                    strokeWidth={1.5}
-                    className={cn(isRefreshing && 'animate-spin')}
-                  />
-                </Button>
-              }
-            />
-            <TooltipContent side="bottom">Sync messages</TooltipContent>
-          </TooltipRoot>
-        </TooltipProvider>
-      ) : null}
-      <UsageMeter />
+        {dataUpdatedAt > 0 ? (
+          <TooltipProvider>
+            <TooltipRoot>
+              <TooltipTrigger
+                onClick={onRefresh ? handleRefresh : undefined}
+                render={
+                  <button
+                    type="button"
+                    aria-label={isStale ? 'Stale — click to sync' : 'Live'}
+                    className={cn(
+                      'mr-2 inline-flex items-center justify-center rounded-full transition-colors',
+                      isRefreshing && 'animate-pulse',
+                      onRefresh ? 'cursor-pointer hover:opacity-70' : 'cursor-default',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'block size-2 rounded-full transition-colors duration-500',
+                        isStale ? 'bg-amber-400' : 'bg-emerald-500',
+                      )}
+                    />
+                  </button>
+                }
+              />
+              <TooltipContent side="bottom">
+                {isStale ? 'Stale — click to sync' : 'Live'}
+              </TooltipContent>
+            </TooltipRoot>
+          </TooltipProvider>
+        ) : null}
+      </div>
     </div>
   )
 }

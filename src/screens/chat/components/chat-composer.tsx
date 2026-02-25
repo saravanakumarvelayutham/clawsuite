@@ -36,7 +36,7 @@ import {
 import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { Button } from '@/components/ui/button'
-import { fetchModels, switchModel } from '@/lib/gateway-api'
+import { fetchModels, setDefaultModel, switchModel } from '@/lib/gateway-api'
 import type {
   GatewayModelCatalogEntry,
   GatewayModelSwitchResponse,
@@ -46,14 +46,16 @@ import { usePinnedModels } from '@/hooks/use-pinned-models'
 import { cn } from '@/lib/utils'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder'
+import { toast } from '@/components/ui/toast'
 
 type ChatComposerAttachment = {
   id: string
   name: string
   contentType: string
   size: number
-  dataUrl: string
-  previewUrl: string
+  dataUrl?: string
+  previewUrl?: string
+  kind?: 'image' | 'file' | 'audio'
 }
 
 type ChatComposerProps = {
@@ -100,6 +102,77 @@ type ModelSwitchNotice = {
   retryModel?: string
 }
 
+/** Maximum file size accepted from picker/drop before processing (50MB). */
+const MAX_ATTACHMENT_FILE_SIZE = 50 * 1024 * 1024
+/** Longest side target for resized images. */
+const MAX_IMAGE_DIMENSION = 1920
+/** Initial JPEG compression quality (0-1). */
+const IMAGE_QUALITY = 0.85
+/** Gateway-safe image attachment limit after processing (1MB). */
+const MAX_TRANSPORT_IMAGE_SIZE = 1 * 1024 * 1024
+
+const IMAGE_EXTENSION_TO_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  svg: 'image/svg+xml',
+  avif: 'image/avif',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  tif: 'image/tiff',
+  tiff: 'image/tiff',
+}
+
+const TEXT_EXTENSION_TO_MIME: Record<string, string> = {
+  md: 'text/markdown',
+  txt: 'text/plain',
+  json: 'application/json',
+  csv: 'text/csv',
+  ts: 'text/plain',
+  tsx: 'text/plain',
+  js: 'text/plain',
+  py: 'text/plain',
+}
+
+function normalizeMimeType(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function isImageMimeType(value: string): boolean {
+  const normalized = normalizeMimeType(value)
+  return normalized.startsWith('image/')
+}
+
+function inferImageMimeTypeFromFileName(name: string): string {
+  const match = /\.([a-z0-9]+)$/i.exec(name.trim())
+  if (!match?.[1]) return ''
+  return IMAGE_EXTENSION_TO_MIME[match[1].toLowerCase()] || ''
+}
+
+function inferTextMimeTypeFromFileName(name: string): string {
+  const match = /\.([a-z0-9]+)$/i.exec(name.trim())
+  if (!match?.[1]) return ''
+  return TEXT_EXTENSION_TO_MIME[match[1].toLowerCase()] || ''
+}
+
+function isTextMimeType(value: string): boolean {
+  const normalized = normalizeMimeType(value)
+  return normalized.startsWith('text/') || normalized === 'application/json'
+}
+
+function isImageFile(file: File): boolean {
+  if (isImageMimeType(file.type)) return true
+  return inferImageMimeTypeFromFileName(file.name).length > 0
+}
+
+function isTextFile(file: File): boolean {
+  if (isTextMimeType(file.type)) return true
+  return inferTextMimeTypeFromFileName(file.name).length > 0
+}
+
 function formatFileSize(size: number): string {
   if (!Number.isFinite(size) || size <= 0) return ''
   const units = ['B', 'KB', 'MB', 'GB'] as const
@@ -113,15 +186,46 @@ function formatFileSize(size: number): string {
   return `${value.toFixed(precision)} ${units[unitIndex]}`
 }
 
-function hasImageData(dt: DataTransfer | null): boolean {
+function hasAttachableData(dt: DataTransfer | null): boolean {
   if (!dt) return false
   const items = Array.from(dt.items)
   if (
-    items.some((item) => item.kind === 'file' && item.type.startsWith('image/'))
+    items.some(
+      (item) =>
+        item.kind === 'file' &&
+        (isImageMimeType(item.type) || isTextMimeType(item.type) || item.type.trim().length === 0),
+    )
   )
     return true
   const files = Array.from(dt.files)
-  return files.some((file) => file.type.startsWith('image/'))
+  return files.some(
+    (file) => isImageFile(file) || isTextFile(file) || file.type.trim().length === 0,
+  )
+}
+
+function collectFilesFromDataTransfer(dt: DataTransfer | null): Array<File> {
+  if (!dt) return []
+  const files: Array<File> = []
+  const seen = new Set<string>()
+
+  const pushFile = (file: File | null) => {
+    if (!file) return
+    const key = `${file.name}:${file.size}:${file.lastModified}:${file.type}`
+    if (seen.has(key)) return
+    seen.add(key)
+    files.push(file)
+  }
+
+  for (const item of Array.from(dt.items)) {
+    if (item.kind !== 'file') continue
+    pushFile(item.getAsFile())
+  }
+
+  for (const file of Array.from(dt.files)) {
+    pushFile(file)
+  }
+
+  return files
 }
 
 async function readFileAsDataUrl(file: File): Promise<string | null> {
@@ -135,8 +239,107 @@ async function readFileAsDataUrl(file: File): Promise<string | null> {
   })
 }
 
+async function readFileAsText(file: File): Promise<string | null> {
+  return await new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      resolve(typeof reader.result === 'string' ? reader.result : null)
+    }
+    reader.onerror = () => resolve(null)
+    reader.readAsText(file)
+  })
+}
+
 function readText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function isCanvasSupported(): boolean {
+  if (typeof document === 'undefined') return false
+  try {
+    const canvas = document.createElement('canvas')
+    return Boolean(canvas.getContext('2d'))
+  } catch {
+    return false
+  }
+}
+
+function estimateDataUrlBytes(dataUrl: string): number {
+  const commaIndex = dataUrl.indexOf(',')
+  const base64 = commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl
+  if (!base64) return 0
+  const padding =
+    base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding)
+}
+
+function readDataUrlMimeType(dataUrl: string): string | null {
+  const match = /^data:([^;]+);base64,/.exec(dataUrl)
+  return match?.[1]?.trim() || null
+}
+
+async function compressImageToDataUrl(file: File): Promise<string> {
+  if (!isCanvasSupported()) {
+    throw new Error('Image compression not available')
+  }
+
+  return await new Promise((resolve, reject) => {
+    const image = new Image()
+    const objectUrl = URL.createObjectURL(file)
+    const cleanup = () => URL.revokeObjectURL(objectUrl)
+
+    image.onload = () => {
+      try {
+        let width = image.width
+        let height = image.height
+
+        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+          if (width > height) {
+            height = Math.round((height * MAX_IMAGE_DIMENSION) / width)
+            width = MAX_IMAGE_DIMENSION
+          } else {
+            width = Math.round((width * MAX_IMAGE_DIMENSION) / height)
+            height = MAX_IMAGE_DIMENSION
+          }
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const context = canvas.getContext('2d')
+        if (!context) {
+          cleanup()
+          reject(new Error('Failed to get canvas context'))
+          return
+        }
+
+        context.drawImage(image, 0, 0, width, height)
+
+        let quality = IMAGE_QUALITY
+        let dataUrl = canvas.toDataURL('image/jpeg', quality)
+        let bytes = estimateDataUrlBytes(dataUrl)
+
+        while (bytes > MAX_TRANSPORT_IMAGE_SIZE && quality > 0.4) {
+          quality -= 0.08
+          dataUrl = canvas.toDataURL('image/jpeg', quality)
+          bytes = estimateDataUrlBytes(dataUrl)
+        }
+
+        cleanup()
+        resolve(dataUrl)
+      } catch (error) {
+        cleanup()
+        reject(error instanceof Error ? error : new Error('Compression failed'))
+      }
+    }
+
+    image.onerror = () => {
+      cleanup()
+      reject(new Error('Failed to load image'))
+    }
+
+    image.src = objectUrl
+  })
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -350,6 +553,7 @@ function ChatComposerComponent({
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const dragCounterRef = useRef(0)
   const shouldRefocusAfterSendRef = useRef(false)
+  const submittingRef = useRef(false)
   const modelSelectorRef = useRef<HTMLDivElement | null>(null)
   const composerWrapperRef = useRef<HTMLDivElement | null>(null)
   const focusFrameRef = useRef<number | null>(null)
@@ -467,6 +671,23 @@ function ChatComposerComponent({
     },
   })
 
+  const defaultModelMutation = useMutation({
+    mutationFn: async (model: string) => await setDefaultModel(model),
+    onSuccess: (_payload, model) => {
+      setModelNotice({
+        tone: 'success',
+        message: `Default model set to ${model}`,
+      })
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error)
+      setModelNotice({
+        tone: 'error',
+        message: message || 'Failed to set default model',
+      })
+    },
+  })
+
   const handleModelSelect = useCallback(
     function handleModelSelect(nextModel: string) {
       const model = nextModel.trim()
@@ -493,10 +714,20 @@ function ChatComposerComponent({
     [handleModelSelect, retryModel],
   )
 
+  const currentModel = currentModelQuery.data ?? ''
+
+  const handleSetDefaultModel = useCallback(() => {
+    const model = currentModel.trim()
+    if (!model) return
+    setModelNotice(null)
+    defaultModelMutation.mutate(model)
+  }, [currentModel, defaultModelMutation])
+
   const modelsUnavailable = modelsQuery.isError
   const isModelSwitcherDisabled =
     disabled || modelsQuery.isLoading || modelSwitchMutation.isPending
-  const currentModel = currentModelQuery.data ?? ''
+  const isDefaultModelDisabled =
+    disabled || defaultModelMutation.isPending || currentModel.trim().length === 0
   const draftStorageKey = useMemo(
     () => toDraftStorageKey(sessionKey),
     [sessionKey],
@@ -713,35 +944,97 @@ function ChatComposerComponent({
   const addAttachments = useCallback(
     async (files: Array<File>) => {
       if (disabled) return
-      const imageFiles = files.filter((file) => file.type.startsWith('image/'))
-      if (imageFiles.length === 0) return
 
       const timestamp = Date.now()
       const prepared = await Promise.all(
-        imageFiles.map(
-          async (file, index): Promise<ChatComposerAttachment | null> => {
-            const dataUrl = await readFileAsDataUrl(file)
-            if (!dataUrl) return null
+        files.map(async (file, index): Promise<ChatComposerAttachment | null> => {
+          const imageFile = isImageFile(file)
+          const textFile = isTextFile(file)
+          if (!imageFile && !textFile && file.type.trim().length > 0) {
+            return null
+          }
+
+          if (file.size > MAX_ATTACHMENT_FILE_SIZE) {
+            toast(
+              `“${file.name || 'file'}” is ${formatFileSize(file.size)}. Max upload input size is ${formatFileSize(MAX_ATTACHMENT_FILE_SIZE)}.`,
+              { type: 'warning' },
+            )
+            return null
+          }
+
+          if (textFile) {
+            const textContent = await readFileAsText(file)
+            if (textContent === null) return null
             const name =
               file.name && file.name.trim().length > 0
                 ? file.name.trim()
-                : `pasted-image-${timestamp}-${index + 1}.png`
+                : `pasted-text-${timestamp}-${index + 1}.txt`
+            const textBytes = new TextEncoder().encode(textContent).length
             return {
               id: crypto.randomUUID(),
               name,
-              contentType: file.type || 'image/png',
-              size: file.size,
-              dataUrl,
-              previewUrl: dataUrl,
+              contentType:
+                (isTextMimeType(file.type) ? normalizeMimeType(file.type) : '') ||
+                inferTextMimeTypeFromFileName(name) ||
+                'text/plain',
+              size: textBytes,
+              dataUrl: textContent,
+              kind: 'file',
             }
-          },
-        ),
+          }
+
+          const compressedDataUrl = await compressImageToDataUrl(file).catch(() => null)
+          const dataUrl = compressedDataUrl || (await readFileAsDataUrl(file))
+          if (!dataUrl) return null
+
+          const dataUrlMimeType = readDataUrlMimeType(dataUrl)
+          if (!isImageMimeType(dataUrlMimeType || '')) {
+            return null
+          }
+
+          const transportBytes = estimateDataUrlBytes(dataUrl)
+          if (transportBytes > MAX_TRANSPORT_IMAGE_SIZE) {
+            toast(
+              `Image compressed to ${(transportBytes / (1024 * 1024)).toFixed(2)}mb — still over the 1mb limit. Try a smaller screenshot.`,
+              { type: 'warning' },
+            )
+            return null
+          }
+
+          const name =
+            file.name && file.name.trim().length > 0
+              ? file.name.trim()
+              : `pasted-image-${timestamp}-${index + 1}.jpg`
+          const detectedMimeType =
+            dataUrlMimeType ||
+            (isImageMimeType(file.type) ? normalizeMimeType(file.type) : '') ||
+            inferImageMimeTypeFromFileName(name) ||
+            'image/jpeg'
+          return {
+            id: crypto.randomUUID(),
+            name,
+            contentType: detectedMimeType,
+            size: transportBytes,
+            dataUrl,
+            previewUrl: dataUrl,
+            kind: 'image',
+          }
+        }),
       )
 
       const valid = prepared.filter(
-        (attachment): attachment is ChatComposerAttachment =>
-          attachment !== null,
+        (attachment): attachment is ChatComposerAttachment => attachment !== null,
       )
+
+      const skippedCount = prepared.length - valid.length
+      if (skippedCount > 0) {
+        toast(
+          skippedCount === 1
+            ? '1 file could not be attached.'
+            : `${skippedCount} files could not be attached.`,
+          { type: 'warning' },
+        )
+      }
 
       if (valid.length === 0) return
 
@@ -754,15 +1047,7 @@ function ChatComposerComponent({
   const handlePaste = useCallback(
     (event: React.ClipboardEvent<HTMLDivElement>) => {
       if (disabled) return
-      const items = Array.from(event.clipboardData.items)
-      const files: Array<File> = []
-      for (const item of items) {
-        if (item.kind !== 'file') continue
-        const file = item.getAsFile()
-        if (file && file.type.startsWith('image/')) {
-          files.push(file)
-        }
-      }
+      const files = collectFilesFromDataTransfer(event.clipboardData)
       if (files.length === 0) return
 
       const text = event.clipboardData.getData('text/plain')
@@ -777,7 +1062,7 @@ function ChatComposerComponent({
   const handleDragEnter = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       if (disabled) return
-      if (!hasImageData(event.dataTransfer)) return
+      if (!hasAttachableData(event.dataTransfer)) return
       event.preventDefault()
       dragCounterRef.current += 1
       setIsDraggingOver(true)
@@ -802,7 +1087,7 @@ function ChatComposerComponent({
     (event: React.DragEvent<HTMLDivElement>) => {
       if (disabled) return
       event.preventDefault()
-      if (hasImageData(event.dataTransfer)) {
+      if (hasAttachableData(event.dataTransfer)) {
         event.dataTransfer.dropEffect = 'copy'
       }
     },
@@ -813,7 +1098,7 @@ function ChatComposerComponent({
     (event: React.DragEvent<HTMLDivElement>) => {
       if (disabled) return
       event.preventDefault()
-      const files = Array.from(event.dataTransfer.files)
+      const files = collectFilesFromDataTransfer(event.dataTransfer)
       resetDragState()
       if (files.length === 0) return
       void addAttachments(files)
@@ -823,16 +1108,25 @@ function ChatComposerComponent({
 
   const handleSubmit = useCallback(() => {
     if (disabled) return
+    if (submittingRef.current) return
     const body = value.trim()
     if (body.length === 0 && attachments.length === 0) return
+    submittingRef.current = true
     const attachmentPayload = attachments.map((attachment) => ({
       ...attachment,
     }))
-    onSubmit(body, attachmentPayload, {
-      reset,
-      setValue: setComposerValue,
-      setAttachments: setComposerAttachments,
-    })
+    try {
+      onSubmit(body, attachmentPayload, {
+        reset,
+        setValue: setComposerValue,
+        setAttachments: setComposerAttachments,
+      })
+    } finally {
+      // Reset after a tick so rapid re-fires (double-click, Enter+form submit) are blocked
+      setTimeout(() => {
+        submittingRef.current = false
+      }, 300)
+    }
     clearDraft()
     shouldRefocusAfterSendRef.current = true
     setFocusAfterSubmitTick((prev) => prev + 1)
@@ -863,13 +1157,30 @@ function ChatComposerComponent({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleSubmit])
 
+  // ⌘+Shift+M (Mac) / Ctrl+Shift+M (Win) to open model selector
+  useEffect(() => {
+    const handleModelShortcut = (event: KeyboardEvent) => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        event.key.toLowerCase() === 'm'
+      ) {
+        event.preventDefault()
+        event.stopPropagation()
+        setIsModelMenuOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleModelShortcut, true)
+    return () => window.removeEventListener('keydown', handleModelShortcut, true)
+  }, [])
+
   const submitDisabled =
     disabled || (value.trim().length === 0 && attachments.length === 0)
 
   const hasDraft = value.trim().length > 0 || attachments.length > 0
   const promptPlaceholder = isMobileViewport
     ? 'Message...'
-    : 'Ask anything... (⌘↵ to send)'
+    : 'Ask anything... (↵ to send · ⇧↵ new line · ⌘⇧M switch model)'
   const slashCommandQuery = useMemo(() => readSlashCommandQuery(value), [value])
   const isSlashMenuOpen =
     slashCommandQuery !== null && !disabled && !isSlashMenuDismissed
@@ -935,12 +1246,13 @@ function ChatComposerComponent({
   const isLongPressRef = useRef(false)
   const handleMicPointerDown = useCallback(() => {
     isLongPressRef.current = false
-    // Don't start long-press recording if voice-to-text is active (user is tapping to stop)
-    if (voiceInput.isListening) return
-    longPressTimerRef.current = setTimeout(() => {
-      isLongPressRef.current = true
-      voiceRecorder.start()
-    }, 500) // 500ms = long press threshold
+    // Start long-press timer for voice note recording (only if not already doing voice-to-text)
+    if (!voiceInput.isListening && !voiceRecorder.isRecording) {
+      longPressTimerRef.current = setTimeout(() => {
+        isLongPressRef.current = true
+        voiceRecorder.start()
+      }, 500)
+    }
   }, [voiceRecorder, voiceInput.isListening])
   const handleMicPointerUp = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -948,20 +1260,12 @@ function ChatComposerComponent({
       longPressTimerRef.current = null
     }
     if (isLongPressRef.current) {
-      // Was a long press — stop recording
+      // Was a long press — stop voice note recording
       voiceRecorder.stop()
       isLongPressRef.current = false
-    } else {
-      // Was a tap — toggle voice-to-text
-      if (voiceRecorder.isRecording) {
-        voiceRecorder.stop()
-      } else if (voiceInput.isListening) {
-        voiceInput.stop()
-      } else {
-        voiceInput.start()
-      }
     }
-  }, [voiceInput, voiceRecorder])
+    // Short taps are handled by onClick for voice-to-text toggle
+  }, [voiceRecorder])
 
   const handleAbort = useCallback(
     async function handleAbort() {
@@ -1016,7 +1320,8 @@ function ChatComposerComponent({
     setIsSlashMenuDismissed(true)
   }, [])
 
-  const handlePromptSubmit = useCallback(() => {
+  const handlePromptSubmit = useCallback((e?: React.FormEvent) => {
+    e?.preventDefault()
     if (isSlashMenuOpen) {
       const applied = slashMenuRef.current?.selectActive() ?? false
       if (!applied) {
@@ -1029,21 +1334,28 @@ function ChatComposerComponent({
 
   const handlePromptKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (!isSlashMenuOpen) return
-      if (event.key === 'ArrowDown') {
-        event.preventDefault()
-        slashMenuRef.current?.moveSelection(1)
-        return
+      // Slash menu navigation takes priority
+      if (isSlashMenuOpen) {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault()
+          slashMenuRef.current?.moveSelection(1)
+          return
+        }
+        if (event.key === 'ArrowUp') {
+          event.preventDefault()
+          slashMenuRef.current?.moveSelection(-1)
+          return
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          handleDismissSlashMenu()
+          return
+        }
       }
-      if (event.key === 'ArrowUp') {
-        event.preventDefault()
-        slashMenuRef.current?.moveSelection(-1)
-        return
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        handleDismissSlashMenu()
-      }
+      // Enter-to-send is handled by PromptInputTextarea via the onSubmit prop.
+      // Handling it here too causes handleSubmit() to fire twice on every Enter
+      // keypress (once via onSubmit → handlePromptSubmit, once via this onKeyDown
+      // handler), which duplicates messages when text is pasted then sent.
     },
     [handleDismissSlashMenu, isSlashMenuOpen],
   )
@@ -1065,10 +1377,17 @@ function ChatComposerComponent({
   const keyboardOrFocusActive = mobileKeyboardInset > 0 || mobileComposerFocused
   const composerWrapperStyle = useMemo(
     () => {
+      // When keyboard is active, lift by keyboard inset only (tab bar hides itself).
+      // When keyboard is inactive, lift by tab bar height + safe area so the input
+      // sits visually above the bottom nav bar.
       const tabBarOffset = keyboardOrFocusActive
         ? '0px'
-        : 'max(0px, calc(var(--mobile-tab-bar-offset) - 0.375rem))'
-      const mobileTranslate = `translateY(calc(-1 * (${tabBarOffset} + var(--kb-inset, 0px))))`
+        : 'max(0px, var(--mobile-tab-bar-offset, 3.75rem))'
+      const safeAreaInset = 'env(safe-area-inset-bottom, 0px)'
+      const kbInset = 'var(--kb-inset, 0px)'
+      const mobileTranslate = keyboardOrFocusActive
+        ? `translateY(calc(-1 * (${kbInset})))`
+        : `translateY(calc(-1 * (${tabBarOffset} + ${safeAreaInset})))`
       return {
         maxWidth: 'min(768px, 100%)',
         '--mobile-tab-bar-offset': MOBILE_TAB_BAR_OFFSET,
@@ -1086,7 +1405,10 @@ function ChatComposerComponent({
         isMobileViewport
           ? 'fixed inset-x-0 bottom-0 z-[70] transition-transform duration-200'
           : 'relative z-40 shrink-0',
-        'pb-[max(var(--safe-b),0px)] md:pb-[calc(var(--safe-b)+0.75rem)]',
+        // Mobile: pin above tab bar + safe-area inset. Desktop: normal bottom padding.
+        isMobileViewport
+          ? 'pb-[calc(max(var(--safe-b),env(safe-area-inset-bottom))+0.25rem)]'
+          : 'pb-[max(var(--safe-b),0px)] md:pb-[calc(var(--safe-b)+0.75rem)]',
         'md:bg-surface/95 md:backdrop-blur md:transition-[padding-bottom,background-color,backdrop-filter] md:duration-200',
       )}
       style={composerWrapperStyle}
@@ -1095,7 +1417,7 @@ function ChatComposerComponent({
       <input
         ref={attachmentInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.md,.txt,.json,.csv,.ts,.tsx,.js,.py"
         multiple
         className="hidden"
         onChange={handleAttachmentInputChange}
@@ -1128,51 +1450,75 @@ function ChatComposerComponent({
 
         {isDraggingOver ? (
           <div className="pointer-events-none absolute inset-1 z-20 flex items-center justify-center rounded-[18px] border-2 border-dashed border-primary-400 bg-primary-50/90 text-sm font-medium text-primary-700">
-            Drop images to attach
+            Drop files to attach
           </div>
         ) : null}
 
         {attachments.length > 0 ? (
           <div className="px-3">
             <div className="flex flex-wrap gap-3">
-              {attachments.map((attachment) => (
-                <div key={attachment.id} className="group relative w-28">
-                  <button
-                    type="button"
-                    className="aspect-square w-full overflow-hidden rounded-xl border border-primary-200 bg-primary-50"
-                    onClick={() => setPreviewImage({ url: attachment.previewUrl, name: attachment.name || 'Attached image' })}
-                    aria-label={`Preview ${attachment.name || 'image'}`}
+              {attachments.map((attachment) => {
+                const isImageAttachment =
+                  Boolean(attachment.previewUrl) &&
+                  isImageMimeType(attachment.contentType)
+
+                return (
+                  <div
+                    key={attachment.id}
+                    className={cn(
+                      'group relative',
+                      isImageAttachment ? 'w-28' : 'w-auto max-w-[16rem]',
+                    )}
                   >
-                    <img
-                      src={attachment.previewUrl}
-                      alt={attachment.name || 'Attached image'}
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Remove image attachment"
-                    onClick={(event) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      handleRemoveAttachment(attachment.id)
-                    }}
-                    className="absolute right-1 top-1 z-10 inline-flex size-6 items-center justify-center rounded-full bg-primary-900/80 text-primary-50 opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100 focus-visible:opacity-100"
-                  >
-                    <HugeiconsIcon
-                      icon={Cancel01Icon}
-                      size={20}
-                      strokeWidth={1.5}
-                    />
-                  </button>
-                  <div className="mt-1 truncate text-xs font-medium text-primary-700">
-                    {attachment.name}
+                    {isImageAttachment ? (
+                      <button
+                        type="button"
+                        className="aspect-square w-full overflow-hidden rounded-xl border border-primary-200 bg-primary-50"
+                        onClick={() =>
+                          setPreviewImage({
+                            url: attachment.previewUrl || '',
+                            name: attachment.name || 'Attached image',
+                          })
+                        }
+                        aria-label={`Preview ${attachment.name || 'image'}`}
+                      >
+                        <img
+                          src={attachment.previewUrl}
+                          alt={attachment.name || 'Attached image'}
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                    ) : (
+                      <div className="rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-700">
+                        <span className="mr-1">📄</span>
+                        <span className="truncate">{attachment.name}</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      aria-label="Remove attachment"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        handleRemoveAttachment(attachment.id)
+                      }}
+                      className="absolute right-1 top-1 z-10 inline-flex size-6 items-center justify-center rounded-full bg-primary-900/80 text-primary-50 opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100 focus-visible:opacity-100"
+                    >
+                      <HugeiconsIcon
+                        icon={Cancel01Icon}
+                        size={20}
+                        strokeWidth={1.5}
+                      />
+                    </button>
+                    <div className="mt-1 truncate text-xs font-medium text-primary-700">
+                      {attachment.name}
+                    </div>
+                    <div className="text-[11px] text-primary-400">
+                      {formatFileSize(attachment.size)}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-primary-400">
-                    {formatFileSize(attachment.size)}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         ) : null}
@@ -1205,7 +1551,7 @@ function ChatComposerComponent({
               <Button
                 size="icon-sm"
                 variant="ghost"
-                className="rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500"
+                className="rounded-lg text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-primary-500"
                 aria-label="Add attachment"
                 disabled={disabled}
                 onClick={handleOpenAttachmentPicker}
@@ -1218,7 +1564,7 @@ function ChatComposerComponent({
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  className="rounded-lg text-primary-400 hover:bg-primary-100 hover:text-red-600"
+                  className="rounded-lg text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-red-600"
                   aria-label="Clear draft"
                   onClick={handleClearDraft}
                 >
@@ -1242,7 +1588,7 @@ function ChatComposerComponent({
                   setIsModelMenuOpen((prev) => !prev)
                 }}
                 className={cn(
-                  'inline-flex h-7 max-w-[8rem] items-center gap-0.5 rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 md:gap-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-200 hover:text-primary-800',
+                  'inline-flex h-7 max-w-[8rem] items-center gap-0.5 rounded-full bg-primary-100/70 px-1.5 md:max-w-none md:px-2.5 md:gap-1 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-800',
                   isModelSwitcherDisabled &&
                     'cursor-not-allowed opacity-50',
                 )}
@@ -1263,6 +1609,21 @@ function ChatComposerComponent({
                   strokeWidth={2}
                   className="opacity-60"
                 />
+              </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  handleSetDefaultModel()
+                }}
+                className={cn(
+                  'hidden md:inline-flex h-7 items-center rounded-full border border-primary-200 bg-primary-50 px-2 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-100 dark:hover:bg-primary-800',
+                  isDefaultModelDisabled && 'cursor-not-allowed opacity-50',
+                )}
+                disabled={isDefaultModelDisabled}
+                title={currentModel ? `Set ${currentModel} as default` : 'No active model'}
+              >
+                Set as default
               </button>
               {modelAvailabilityLabel ? (
                 <span className="hidden text-xs text-primary-500 text-pretty md:inline">
@@ -1287,7 +1648,7 @@ function ChatComposerComponent({
                         handleRetryModelSwitch()
                       }}
                       className={cn(
-                        'rounded px-1 font-medium text-primary-700 hover:bg-primary-100',
+                        'rounded px-1 font-medium text-primary-700 hover:bg-primary-100 dark:hover:bg-primary-800',
                         modelSwitchMutation.isPending &&
                           'cursor-not-allowed opacity-60',
                       )}
@@ -1323,7 +1684,7 @@ function ChatComposerComponent({
                         href="https://docs.openclaw.ai/configuration"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 rounded-lg bg-accent-500/10 px-3 py-1.5 text-xs font-medium text-accent-600 hover:bg-accent-500/20 transition-colors"
+                        className="inline-flex items-center gap-1 rounded-lg bg-accent-500/10 px-3 py-1.5 text-xs font-medium text-accent-600 hover:bg-accent-50 dark:hover:bg-accent-900/300/20 transition-colors"
                       >
                         Setup Guide →
                       </a>
@@ -1333,13 +1694,13 @@ function ChatComposerComponent({
                       {/* Phase 4.2: Pinned models section */}
                       {(pinnedModels.length > 0 ||
                         unavailablePinnedModels.length > 0) && (
-                        <div className="mb-2 border-t border-gray-200 bg-gray-50 py-2">
-                          <div className="mb-1.5 flex items-center gap-1 px-3 text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                        <div className="mb-2 border-t border-neutral-200 bg-neutral-50 py-2">
+                          <div className="mb-1.5 flex items-center gap-1 px-3 text-[11px] font-medium uppercase tracking-wider text-neutral-500">
                             <HugeiconsIcon
                               icon={PinIcon}
                               size={14}
                               strokeWidth={1.5}
-                              className="text-orange-500"
+                              className="text-accent-500"
                             />
                             <span>Pinned</span>
                           </div>
@@ -1361,9 +1722,9 @@ function ChatComposerComponent({
                                     handleModelSelect(option.value)
                                   }}
                                   className={cn(
-                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50',
+                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:hover:bg-white/10',
                                     optionActive &&
-                                      'border-l-2 border-orange-500 bg-gray-100 text-gray-900',
+                                      'border-l-2 border-accent-500 bg-neutral-100 text-neutral-900',
                                   )}
                                   role="option"
                                   aria-selected={optionActive}
@@ -1374,7 +1735,7 @@ function ChatComposerComponent({
                                   </span>
                                   {optionActive && (
                                     <span
-                                      className="h-1.5 w-1.5 rounded-full bg-orange-500"
+                                      className="h-1.5 w-1.5 rounded-full bg-accent-500"
                                       aria-label="Currently active"
                                     />
                                   )}
@@ -1385,7 +1746,7 @@ function ChatComposerComponent({
                                     event.stopPropagation()
                                     togglePin(option.value)
                                   }}
-                                  className="absolute right-3 rounded px-1 text-xs leading-none text-orange-500 opacity-80 transition-opacity hover:bg-orange-50 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-orange-300"
+                                  className="absolute right-3 rounded px-1 text-xs leading-none text-accent-500 opacity-80 transition-opacity hover:bg-accent-50 dark:hover:bg-accent-900/30 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300"
                                   aria-label={`Unpin ${option.label}`}
                                   title="Unpin"
                                 >
@@ -1404,7 +1765,7 @@ function ChatComposerComponent({
                               key={modelId}
                               className="group relative flex items-center"
                             >
-                              <div className="flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-gray-400 opacity-60">
+                              <div className="flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-400 opacity-60">
                                 <span className="flex-1 truncate font-medium">
                                   {modelId}
                                 </span>
@@ -1418,7 +1779,7 @@ function ChatComposerComponent({
                                   event.stopPropagation()
                                   togglePin(modelId)
                                 }}
-                                className="absolute right-3 rounded px-2 py-0.5 text-[10px] text-red-500 opacity-80 transition-opacity hover:bg-red-50 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-red-300"
+                                className="absolute right-3 rounded px-2 py-0.5 text-[10px] text-red-500 opacity-80 transition-opacity hover:bg-red-50 dark:hover:bg-red-900/30 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-red-300"
                                 aria-label={`Remove unavailable pinned model ${modelId}`}
                                 title="Remove"
                               >
@@ -1432,7 +1793,7 @@ function ChatComposerComponent({
                       {/* Regular models grouped by provider */}
                       {unpinnedGroupedModels.map(([provider, models]) => (
                         <div key={provider} className="mb-2 last:mb-0">
-                          <div className="border-t border-gray-100 px-3 pb-2 pt-3 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+                          <div className="border-t border-neutral-100 px-3 pb-2 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-400">
                             {provider}
                           </div>
                           {models.map((option) => {
@@ -1453,9 +1814,9 @@ function ChatComposerComponent({
                                     handleModelSelect(option.value)
                                   }}
                                   className={cn(
-                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50',
+                                    'flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:hover:bg-white/10',
                                     optionActive &&
-                                      'border-l-2 border-orange-500 bg-gray-100 text-gray-900',
+                                      'border-l-2 border-accent-500 bg-neutral-100 text-neutral-900',
                                   )}
                                   role="option"
                                   aria-selected={optionActive}
@@ -1466,7 +1827,7 @@ function ChatComposerComponent({
                                   </span>
                                   {optionActive && (
                                     <span
-                                      className="h-1.5 w-1.5 rounded-full bg-orange-500"
+                                      className="h-1.5 w-1.5 rounded-full bg-accent-500"
                                       aria-label="Currently active"
                                     />
                                   )}
@@ -1477,7 +1838,7 @@ function ChatComposerComponent({
                                     event.stopPropagation()
                                     togglePin(option.value)
                                   }}
-                                  className="absolute right-3 rounded px-1 text-xs leading-none text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-orange-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-orange-300 group-hover:opacity-100"
+                                  className="absolute right-3 rounded px-1 text-xs leading-none text-neutral-400 opacity-0 transition-opacity hover:bg-neutral-100 dark:hover:bg-white/10 hover:text-accent-500 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-accent-300 group-hover:opacity-100"
                                   aria-label={`Pin ${option.label}`}
                                   title="Pin"
                                 >
@@ -1519,6 +1880,16 @@ function ChatComposerComponent({
                 }
               >
                 <Button
+                  onClick={() => {
+                    // Toggle voice input on click
+                    if (voiceInput.isListening) {
+                      voiceInput.stop()
+                    } else if (voiceRecorder.isRecording) {
+                      voiceRecorder.stop()
+                    } else {
+                      voiceInput.start()
+                    }
+                  }}
                   onPointerDown={handleMicPointerDown}
                   onPointerUp={handleMicPointerUp}
                   onPointerLeave={handleMicPointerUp}
@@ -1530,7 +1901,7 @@ function ChatComposerComponent({
                       ? 'text-red-600 bg-red-100 hover:bg-red-200 animate-pulse'
                       : voiceInput.isListening
                         ? 'text-red-500 bg-red-50 hover:bg-red-100 animate-pulse'
-                        : 'text-primary-500 hover:bg-primary-100 hover:text-primary-700',
+                        : 'text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-800 hover:text-primary-700',
                   )}
                   aria-label={
                     voiceRecorder.isRecording
@@ -1566,6 +1937,7 @@ function ChatComposerComponent({
             ) : (
               <PromptInputAction tooltip="Send message">
                 <Button
+                  type="button"
                   onClick={handleSubmit}
                   disabled={submitDisabled}
                   size="icon-sm"
@@ -1594,7 +1966,7 @@ function ChatComposerComponent({
         >
           <button
             type="button"
-            className="absolute right-4 top-4 z-10 inline-flex size-10 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 active:bg-white/40 transition-colors"
+            className="absolute right-4 top-4 z-10 inline-flex size-10 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white dark:hover:bg-white/10/30 active:bg-white/40 transition-colors"
             onClick={(e) => { e.stopPropagation(); setPreviewImage(null) }}
             aria-label="Close preview"
           >

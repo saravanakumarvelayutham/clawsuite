@@ -67,6 +67,16 @@ function toSessionUpdatedAt(session: SessionMeta): number {
   return 0
 }
 
+function isSubagentSession(session: { key?: string; label?: string }): boolean {
+  const key = session.key ?? ''
+  const label = session.label ?? ''
+  return (
+    key.startsWith('agent:main:subagent:') ||
+    key.includes('subagent') ||
+    label.toLowerCase().includes('subagent')
+  )
+}
+
 export function RecentSessionsWidget({
   onOpenSession,
   draggable = false,
@@ -82,19 +92,25 @@ export function RecentSessionsWidget({
     function buildRecentSessions() {
       const rows = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
 
-      return [...rows]
-        .sort(function sortByMostRecent(a, b) {
-          return toSessionUpdatedAt(b) - toSessionUpdatedAt(a)
-        })
-        .slice(0, 5)
-        .map(function mapSession(session): RecentSession {
-          return {
-            friendlyId: session.friendlyId,
-            title: toSessionTitle(session),
-            preview: toSessionPreview(session),
-            updatedAt: toSessionUpdatedAt(session),
-          }
-        })
+      const filtered = rows.filter((s) => !isSubagentSession(s))
+
+      const sorted = [...filtered].sort(function sortByMostRecent(a, b) {
+        return toSessionUpdatedAt(b) - toSessionUpdatedAt(a)
+      })
+
+      // Prefer sessions active in the last 24h; fall back to all if none qualify
+      const oneDayAgo = Date.now() - 86_400_000
+      const recentRows = sorted.filter((s) => toSessionUpdatedAt(s) > oneDayAgo)
+      const displayRows = recentRows.length > 0 ? recentRows : sorted
+
+      return displayRows.slice(0, 5).map(function mapSession(session): RecentSession {
+        return {
+          friendlyId: session.friendlyId,
+          title: toSessionTitle(session),
+          preview: toSessionPreview(session),
+          updatedAt: toSessionUpdatedAt(session),
+        }
+      })
     },
     [sessionsQuery.data],
   )
@@ -107,27 +123,27 @@ export function RecentSessionsWidget({
       description=""
       icon={Clock01Icon}
       titleAccessory={
-        <span className="inline-flex items-center rounded-full border border-primary-200 bg-primary-100/70 px-2 py-0.5 text-[11px] font-medium text-primary-500 tabular-nums">
-          {sessions.length}
+        <span className="inline-flex items-center rounded-full border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950 px-2 py-0.5 font-mono text-[11px] font-medium text-primary-800 dark:text-neutral-200 tabular-nums">
+          {sessions.length} active
         </span>
       }
       draggable={draggable}
       onRemove={onRemove}
-      className="h-full rounded-xl border-primary-200 p-3.5 md:p-4 shadow-sm [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:normal-case [&_h2]:text-ink"
+      className="h-full rounded-xl border border-neutral-200 dark:border-neutral-700 border-l-4 border-l-teal-500 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-[0_6px_20px_rgba(0,0,0,0.25)] [&_svg]:text-teal-500"
     >
       {isLoading ? (
-        <div className="flex h-32 items-center justify-center gap-3 rounded-lg border border-primary-200 bg-primary-100/45">
+        <div className="flex h-32 items-center justify-center gap-3 rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950">
           <span
-            className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-accent-600"
+            className="size-4 animate-spin rounded-full border-2 border-primary-300 dark:border-neutral-700 border-t-neutral-300"
             role="status"
             aria-label="Loading"
           />
-          <span className="text-sm text-primary-600">Loading sessions…</span>
+          <span className="text-sm text-primary-500 dark:text-neutral-400">Loading sessions…</span>
         </div>
       ) : sessions.length === 0 ? (
-        <div className="flex h-32 flex-col items-center justify-center gap-1 rounded-lg border border-primary-200 bg-primary-100/45">
-          <p className="text-sm font-semibold text-ink">No sessions yet</p>
-          <p className="text-xs text-primary-500">
+        <div className="flex h-32 flex-col items-center justify-center gap-1 rounded-lg border border-primary-200 dark:border-neutral-800 bg-primary-50 dark:bg-neutral-950">
+          <p className="text-sm font-semibold text-primary-900 dark:text-neutral-100">No sessions yet</p>
+          <p className="text-xs text-primary-500 dark:text-neutral-400">
             Start a conversation to see recent sessions here
           </p>
         </div>
@@ -139,32 +155,32 @@ export function RecentSessionsWidget({
                 key={session.friendlyId}
                 variant="outline"
                 className={cn(
-                  'group h-auto w-full flex-col items-start rounded-lg border border-primary-200 px-3.5 py-3 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:border-accent-200',
+                  'group h-auto w-full flex-col items-start rounded-lg border border-primary-200 dark:border-neutral-800 px-3.5 py-3 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:border-primary-300 dark:hover:border-neutral-700',
                   index % 2 === 0
-                    ? 'bg-primary-50/90 hover:bg-primary-50'
-                    : 'bg-primary-100/55 hover:bg-primary-100/70',
+                    ? 'bg-primary-50 dark:bg-neutral-950 hover:bg-primary-100 dark:hover:bg-primary-800'
+                    : 'bg-primary-50/80 dark:bg-neutral-950/80 hover:bg-primary-100 dark:hover:bg-primary-800/90',
                 )}
                 onClick={function onSessionClick() {
                   onOpenSession(session.friendlyId)
                 }}
               >
                 <div className="flex w-full items-center justify-between gap-3">
-                  <span className="line-clamp-1 text-sm font-semibold text-ink text-balance">
+                  <span className="line-clamp-1 text-sm font-semibold text-primary-900 dark:text-neutral-100 text-balance">
                     {session.title}
                   </span>
                   <span className="flex shrink-0 items-center gap-1">
-                    <span className="font-mono text-xs text-primary-500 tabular-nums">
+                    <span className="rounded-full border border-primary-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-2 py-0.5 font-mono text-[10px] text-primary-500 dark:text-neutral-400 tabular-nums">
                       {formatSessionTimestamp(session.updatedAt)}
                     </span>
                     <HugeiconsIcon
                       icon={ArrowRight01Icon}
                       size={14}
                       strokeWidth={1.5}
-                      className="text-accent-500 opacity-0 transition-opacity group-hover:opacity-100"
+                      className="text-neutral-500 dark:text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100"
                     />
                   </span>
                 </div>
-                <p className="mt-1 line-clamp-2 w-full text-left text-sm text-primary-600 text-pretty">
+                <p className="mt-1 line-clamp-2 w-full text-left text-sm text-primary-500 dark:text-neutral-400 text-pretty">
                   {session.preview}
                 </p>
               </Button>

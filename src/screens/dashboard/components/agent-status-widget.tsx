@@ -1,3 +1,9 @@
+// @deprecated — Use SquadStatusWidget instead. This widget is no longer
+// included in the dashboard composition but is preserved for reference.
+// See src/screens/dashboard/components/squad-status-widget.tsx
+//
+// formatModelShort below will be migrated to use lib/formatters when this
+// widget is eventually removed.
 import { UserGroupIcon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
@@ -234,7 +240,7 @@ export function AgentStatusWidget({
       }
       draggable={draggable}
       onRemove={onRemove}
-      className="h-full rounded-xl border-primary-200 p-3.5 md:p-4 shadow-sm [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:normal-case [&_h2]:text-ink"
+      className="h-full rounded-xl border border-neutral-200 dark:border-neutral-700 border-l-4 border-l-teal-500 bg-white dark:bg-neutral-900 p-3.5 md:p-4 shadow-sm"
     >
       {sessionsQuery.isLoading && agents.length === 0 ? (
         <div className="flex h-32 items-center justify-center gap-3 rounded-lg border border-primary-200 bg-primary-100/45">

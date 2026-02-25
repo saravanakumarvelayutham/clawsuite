@@ -24,10 +24,15 @@ import { ChatPanelToggle } from '@/components/chat-panel-toggle'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { MobileTabBar } from '@/components/mobile-tab-bar'
 import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard'
+import { ErrorBoundary } from '@/components/error-boundary'
+import { SystemMetricsFooter } from '@/components/system-metrics-footer'
+import { useSettings } from '@/hooks/use-settings'
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 import type { SessionMeta } from '@/screens/chat/types'
 
 type SessionsListResponse = Array<SessionMeta>
+export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
+  'fixed inset-y-0 left-0 w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
 
 async function fetchSessions(): Promise<SessionsListResponse> {
   const res = await fetch('/api/sessions')
@@ -46,6 +51,7 @@ export function WorkspaceShell() {
     select: (state) => state.location.pathname,
   })
 
+  const { settings } = useSettings()
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
@@ -55,7 +61,10 @@ export function WorkspaceShell() {
   useMobileKeyboard()
 
   const [creatingSession, setCreatingSession] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 767px)').matches
+  })
 
   // Fetch actual auth status from server instead of hardcoding
   interface AuthStatus {
@@ -84,6 +93,8 @@ export function WorkspaceShell() {
   const chatMatch = pathname.match(/^\/chat\/(.+)$/)
   const activeFriendlyId = chatMatch ? chatMatch[1] : 'main'
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
+  const showDesktopSidebarBackdrop =
+    !isMobile && !isOnChatRoute && !sidebarCollapsed
 
   // Sessions query — shared across sidebar and chat
   const sessionsQuery = useQuery({
@@ -134,22 +145,25 @@ export function WorkspaceShell() {
     return () => media.removeEventListener('change', update)
   }, [])
 
-  // Auto-collapse sidebar on mobile
+  // Keep mobile sidebar state closed after resize and route changes.
   useEffect(() => {
-    if (isMobile) {
-      setSidebarCollapsed(true)
-    }
-  }, [isMobile, setSidebarCollapsed])
+    if (!isMobile) return
+    setSidebarCollapsed(true)
+  }, [isMobile, pathname, setSidebarCollapsed])
 
   // Listen for global sidebar toggle shortcut
   useEffect(() => {
     function handleToggleEvent() {
+      if (isMobile) {
+        setSidebarCollapsed(true)
+        return
+      }
       toggleSidebar()
     }
     window.addEventListener(SIDEBAR_TOGGLE_EVENT, handleToggleEvent)
     return () =>
       window.removeEventListener(SIDEBAR_TOGGLE_EVENT, handleToggleEvent)
-  }, [toggleSidebar])
+  }, [isMobile, setSidebarCollapsed, toggleSidebar])
 
   // Show loading indicator while checking auth
   if (!authState.checked) {
@@ -171,27 +185,29 @@ export function WorkspaceShell() {
   return (
     <>
       <div
-        className="relative overflow-hidden bg-surface text-primary-900"
+        className="relative overflow-hidden theme-bg theme-text"
         style={{ height: 'calc(var(--vvh, 100dvh) + var(--kb-inset, 0px))' }}
       >
         <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:grid-cols-[auto_1fr]">
           {/* Activity ticker bar */}
           {/* Persistent sidebar */}
           {!isMobile && (
-            <ChatSidebar
-              sessions={sessions}
-              activeFriendlyId={activeFriendlyId}
-              creatingSession={creatingSession}
-              onCreateSession={startNewChat}
-              isCollapsed={sidebarCollapsed}
-              onToggleCollapse={toggleSidebar}
-              onSelectSession={handleSelectSession}
-              onActiveSessionDelete={handleActiveSessionDelete}
-              sessionsLoading={sessionsLoading}
-              sessionsFetching={sessionsFetching}
-              sessionsError={sessionsError}
-              onRetrySessions={refetchSessions}
-            />
+            <div className="relative z-30">
+              <ChatSidebar
+                sessions={sessions}
+                activeFriendlyId={activeFriendlyId}
+                creatingSession={creatingSession}
+                onCreateSession={startNewChat}
+                isCollapsed={sidebarCollapsed}
+                onToggleCollapse={toggleSidebar}
+                onSelectSession={handleSelectSession}
+                onActiveSessionDelete={handleActiveSessionDelete}
+                sessionsLoading={sessionsLoading}
+                sessionsFetching={sessionsFetching}
+                sessionsError={sessionsError}
+                onRetrySessions={refetchSessions}
+              />
+            </div>
           )}
 
           {/* Main content area — renders the matched route */}
@@ -202,12 +218,22 @@ export function WorkspaceShell() {
             className={[
               'h-full min-h-0 min-w-0 overflow-x-hidden',
               isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
-              isMobile && !isOnChatRoute ? 'pb-16' : '',
+              isMobile && !isOnChatRoute
+                ? 'pb-[calc(var(--tabbar-h,64px)+1.5rem)]'
+                : !isMobile && !isOnChatRoute
+                  ? 'pb-[calc(1.5rem+1.75rem)]'
+                  : '',
             ].join(' ')}
             data-tour="chat-area"
           >
-            <div key={pathname} className="page-transition h-full">
-              <Outlet />
+            <div className="page-transition h-full">
+              <ErrorBoundary
+                className="h-full"
+                title="Something went wrong"
+                description="This page failed to render. Reload to try again."
+              >
+                <Outlet />
+              </ErrorBoundary>
             </div>
           </main>
 
@@ -217,9 +243,19 @@ export function WorkspaceShell() {
 
         {/* Floating chat toggle — visible on non-chat routes */}
         {!isOnChatRoute && !isMobile && <ChatPanelToggle />}
+
+        {showDesktopSidebarBackdrop ? (
+          <button
+            type="button"
+            aria-label="Collapse navigation sidebar"
+            onClick={() => setSidebarCollapsed(true)}
+            className={DESKTOP_SIDEBAR_BACKDROP_CLASS}
+          />
+        ) : null}
       </div>
 
       {isMobile ? <MobileTabBar /> : null}
+      {settings.showSystemMetricsFooter ? <SystemMetricsFooter /> : null}
     </>
   )
 }

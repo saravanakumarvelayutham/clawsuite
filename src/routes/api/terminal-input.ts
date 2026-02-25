@@ -3,6 +3,7 @@ import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
+  requireJsonContentType,
 } from '../../server/rate-limit'
 import { getTerminalSession } from '../../server/terminal-sessions'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -18,9 +19,11 @@ export const Route = createFileRoute('/api/terminal-input')({
             { status: 401, headers: { 'Content-Type': 'application/json' } },
           )
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
 
         const ip = getClientIp(request)
-        if (!rateLimit(`terminal:${ip}`, 60, 60_000)) {
+        if (!rateLimit(`terminal:${ip}`, 10, 60_000)) {
           return rateLimitResponse()
         }
 

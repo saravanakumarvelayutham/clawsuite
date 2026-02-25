@@ -24,6 +24,7 @@ import { Route as FilesRouteImport } from './routes/files'
 import { Route as DebugRouteImport } from './routes/debug'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CronRouteImport } from './routes/cron'
+import { Route as CostsRouteImport } from './routes/costs'
 import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as ChannelsRouteImport } from './routes/channels'
 import { Route as BrowserRouteImport } from './routes/browser'
@@ -38,12 +39,14 @@ import { Route as SettingsProvidersRouteImport } from './routes/settings/provide
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-provider'
+import { Route as ApiUsageAnalyticsRouteImport } from './routes/api/usage-analytics'
 import { Route as ApiUsageRouteImport } from './routes/api/usage'
 import { Route as ApiUpdateCheckRouteImport } from './routes/api/update-check'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
+import { Route as ApiSystemMetricsRouteImport } from './routes/api/system-metrics'
 import { Route as ApiStreamRouteImport } from './routes/api/stream'
 import { Route as ApiSkillsRouteImport } from './routes/api/skills'
 import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
@@ -55,9 +58,11 @@ import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usag
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiOpenclawUpdateRouteImport } from './routes/api/openclaw-update'
+import { Route as ApiOllamaHealthRouteImport } from './routes/api/ollama-health'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
+import { Route as ApiGatewayRestartRouteImport } from './routes/api/gateway-restart'
 import { Route as ApiGatewayDiscoverRouteImport } from './routes/api/gateway-discover'
 import { Route as ApiGatewayConfigRouteImport } from './routes/api/gateway-config'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
@@ -77,10 +82,15 @@ import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiAgentSteerRouteImport } from './routes/api/agent-steer'
 import { Route as ApiAgentPauseRouteImport } from './routes/api/agent-pause'
 import { Route as ApiAgentKillRouteImport } from './routes/api/agent-kill'
+import { Route as ApiAgentDispatchRouteImport } from './routes/api/agent-dispatch'
 import { Route as ApiAgentActivityRouteImport } from './routes/api/agent-activity'
 import { Route as ApiTasksIndexRouteImport } from './routes/api/tasks/index'
 import { Route as ApiTasksTaskIdRouteImport } from './routes/api/tasks/$taskId'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
+import { Route as ApiMemoryWriteRouteImport } from './routes/api/memory/write'
+import { Route as ApiMemorySearchRouteImport } from './routes/api/memory/search'
+import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
+import { Route as ApiMemoryListRouteImport } from './routes/api/memory/list'
 import { Route as ApiGatewayUsageRouteImport } from './routes/api/gateway/usage'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway/status'
 import { Route as ApiGatewaySessionsRouteImport } from './routes/api/gateway/sessions'
@@ -98,8 +108,11 @@ import { Route as ApiCronDeleteRouteImport } from './routes/api/cron/delete'
 import { Route as ApiBrowserTabsRouteImport } from './routes/api/browser/tabs'
 import { Route as ApiBrowserStatusRouteImport } from './routes/api/browser/status'
 import { Route as ApiBrowserScreenshotRouteImport } from './routes/api/browser/screenshot'
+import { Route as ApiBrowserNavigateRouteImport } from './routes/api/browser/navigate'
+import { Route as ApiGatewayApprovalsIndexRouteImport } from './routes/api/gateway/approvals/index'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiCronRunsJobIdRouteImport } from './routes/api/cron/runs/$jobId'
+import { Route as ApiGatewayApprovalsApprovalIdActionRouteImport } from './routes/api/gateway/approvals/$approvalId/$action'
 
 const UsageRoute = UsageRouteImport.update({
   id: '/usage',
@@ -176,6 +189,11 @@ const CronRoute = CronRouteImport.update({
   path: '/cron',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CostsRoute = CostsRouteImport.update({
+  id: '/costs',
+  path: '/costs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConnectRoute = ConnectRouteImport.update({
   id: '/connect',
   path: '/connect',
@@ -246,6 +264,11 @@ const ApiValidateProviderRoute = ApiValidateProviderRouteImport.update({
   path: '/api/validate-provider',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiUsageAnalyticsRoute = ApiUsageAnalyticsRouteImport.update({
+  id: '/api/usage-analytics',
+  path: '/api/usage-analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiUsageRoute = ApiUsageRouteImport.update({
   id: '/api/usage',
   path: '/api/usage',
@@ -274,6 +297,11 @@ const ApiTerminalInputRoute = ApiTerminalInputRouteImport.update({
 const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
   id: '/api/terminal-close',
   path: '/api/terminal-close',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSystemMetricsRoute = ApiSystemMetricsRouteImport.update({
+  id: '/api/system-metrics',
+  path: '/api/system-metrics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiStreamRoute = ApiStreamRouteImport.update({
@@ -331,6 +359,11 @@ const ApiOpenclawUpdateRoute = ApiOpenclawUpdateRouteImport.update({
   path: '/api/openclaw-update',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOllamaHealthRoute = ApiOllamaHealthRouteImport.update({
+  id: '/api/ollama-health',
+  path: '/api/ollama-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiModelsRoute = ApiModelsRouteImport.update({
   id: '/api/models',
   path: '/api/models',
@@ -344,6 +377,11 @@ const ApiModelSwitchRoute = ApiModelSwitchRouteImport.update({
 const ApiHistoryRoute = ApiHistoryRouteImport.update({
   id: '/api/history',
   path: '/api/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGatewayRestartRoute = ApiGatewayRestartRouteImport.update({
+  id: '/api/gateway-restart',
+  path: '/api/gateway-restart',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGatewayDiscoverRoute = ApiGatewayDiscoverRouteImport.update({
@@ -441,6 +479,11 @@ const ApiAgentKillRoute = ApiAgentKillRouteImport.update({
   path: '/api/agent-kill',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAgentDispatchRoute = ApiAgentDispatchRouteImport.update({
+  id: '/api/agent-dispatch',
+  path: '/api/agent-dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAgentActivityRoute = ApiAgentActivityRouteImport.update({
   id: '/api/agent-activity',
   path: '/api/agent-activity',
@@ -460,6 +503,26 @@ const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
   id: '/send',
   path: '/send',
   getParentRoute: () => ApiSessionsRoute,
+} as any)
+const ApiMemoryWriteRoute = ApiMemoryWriteRouteImport.update({
+  id: '/api/memory/write',
+  path: '/api/memory/write',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMemorySearchRoute = ApiMemorySearchRouteImport.update({
+  id: '/api/memory/search',
+  path: '/api/memory/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMemoryReadRoute = ApiMemoryReadRouteImport.update({
+  id: '/api/memory/read',
+  path: '/api/memory/read',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMemoryListRoute = ApiMemoryListRouteImport.update({
+  id: '/api/memory/list',
+  path: '/api/memory/list',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGatewayUsageRoute = ApiGatewayUsageRouteImport.update({
   id: '/api/gateway/usage',
@@ -546,6 +609,17 @@ const ApiBrowserScreenshotRoute = ApiBrowserScreenshotRouteImport.update({
   path: '/screenshot',
   getParentRoute: () => ApiBrowserRoute,
 } as any)
+const ApiBrowserNavigateRoute = ApiBrowserNavigateRouteImport.update({
+  id: '/navigate',
+  path: '/navigate',
+  getParentRoute: () => ApiBrowserRoute,
+} as any)
+const ApiGatewayApprovalsIndexRoute =
+  ApiGatewayApprovalsIndexRouteImport.update({
+    id: '/api/gateway/approvals/',
+    path: '/api/gateway/approvals/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -557,6 +631,12 @@ const ApiCronRunsJobIdRoute = ApiCronRunsJobIdRouteImport.update({
   path: '/runs/$jobId',
   getParentRoute: () => ApiCronRoute,
 } as any)
+const ApiGatewayApprovalsApprovalIdActionRoute =
+  ApiGatewayApprovalsApprovalIdActionRouteImport.update({
+    id: '/api/gateway/approvals/$approvalId/$action',
+    path: '/api/gateway/approvals/$approvalId/$action',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -567,6 +647,7 @@ export interface FileRoutesByFullPath {
   '/browser': typeof BrowserRoute
   '/channels': typeof ChannelsRoute
   '/connect': typeof ConnectRoute
+  '/costs': typeof CostsRoute
   '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
   '/debug': typeof DebugRoute
@@ -583,6 +664,7 @@ export interface FileRoutesByFullPath {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
+  '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
   '/api/agent-steer': typeof ApiAgentSteerRoute
@@ -602,9 +684,11 @@ export interface FileRoutesByFullPath {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-config': typeof ApiGatewayConfigRoute
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
+  '/api/gateway-restart': typeof ApiGatewayRestartRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
+  '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
@@ -616,18 +700,21 @@ export interface FileRoutesByFullPath {
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
   '/api/stream': typeof ApiStreamRoute
+  '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/update-check': typeof ApiUpdateCheckRoute
   '/api/usage': typeof ApiUsageRoute
+  '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/browser/navigate': typeof ApiBrowserNavigateRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/status': typeof ApiBrowserStatusRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
@@ -645,11 +732,17 @@ export interface FileRoutesByFullPath {
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/gateway/status': typeof ApiGatewayStatusRoute
   '/api/gateway/usage': typeof ApiGatewayUsageRoute
+  '/api/memory/list': typeof ApiMemoryListRoute
+  '/api/memory/read': typeof ApiMemoryReadRoute
+  '/api/memory/search': typeof ApiMemorySearchRoute
+  '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/tasks/': typeof ApiTasksIndexRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
+  '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -660,6 +753,7 @@ export interface FileRoutesByTo {
   '/browser': typeof BrowserRoute
   '/channels': typeof ChannelsRoute
   '/connect': typeof ConnectRoute
+  '/costs': typeof CostsRoute
   '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
   '/debug': typeof DebugRoute
@@ -675,6 +769,7 @@ export interface FileRoutesByTo {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
+  '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
   '/api/agent-steer': typeof ApiAgentSteerRoute
@@ -694,9 +789,11 @@ export interface FileRoutesByTo {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-config': typeof ApiGatewayConfigRoute
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
+  '/api/gateway-restart': typeof ApiGatewayRestartRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
+  '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
@@ -708,18 +805,21 @@ export interface FileRoutesByTo {
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
   '/api/stream': typeof ApiStreamRoute
+  '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/update-check': typeof ApiUpdateCheckRoute
   '/api/usage': typeof ApiUsageRoute
+  '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/api/browser/navigate': typeof ApiBrowserNavigateRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/status': typeof ApiBrowserStatusRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
@@ -737,11 +837,17 @@ export interface FileRoutesByTo {
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/gateway/status': typeof ApiGatewayStatusRoute
   '/api/gateway/usage': typeof ApiGatewayUsageRoute
+  '/api/memory/list': typeof ApiMemoryListRoute
+  '/api/memory/read': typeof ApiMemoryReadRoute
+  '/api/memory/search': typeof ApiMemorySearchRoute
+  '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/tasks': typeof ApiTasksIndexRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/gateway/approvals': typeof ApiGatewayApprovalsIndexRoute
+  '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -753,6 +859,7 @@ export interface FileRoutesById {
   '/browser': typeof BrowserRoute
   '/channels': typeof ChannelsRoute
   '/connect': typeof ConnectRoute
+  '/costs': typeof CostsRoute
   '/cron': typeof CronRoute
   '/dashboard': typeof DashboardRoute
   '/debug': typeof DebugRoute
@@ -769,6 +876,7 @@ export interface FileRoutesById {
   '/terminal': typeof TerminalRoute
   '/usage': typeof UsageRoute
   '/api/agent-activity': typeof ApiAgentActivityRoute
+  '/api/agent-dispatch': typeof ApiAgentDispatchRoute
   '/api/agent-kill': typeof ApiAgentKillRoute
   '/api/agent-pause': typeof ApiAgentPauseRoute
   '/api/agent-steer': typeof ApiAgentSteerRoute
@@ -788,9 +896,11 @@ export interface FileRoutesById {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-config': typeof ApiGatewayConfigRoute
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
+  '/api/gateway-restart': typeof ApiGatewayRestartRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
+  '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/openclaw-update': typeof ApiOpenclawUpdateRoute
   '/api/paths': typeof ApiPathsRoute
   '/api/ping': typeof ApiPingRoute
@@ -802,18 +912,21 @@ export interface FileRoutesById {
   '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/skills': typeof ApiSkillsRoute
   '/api/stream': typeof ApiStreamRoute
+  '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/update-check': typeof ApiUpdateCheckRoute
   '/api/usage': typeof ApiUsageRoute
+  '/api/usage-analytics': typeof ApiUsageAnalyticsRoute
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/browser/navigate': typeof ApiBrowserNavigateRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/status': typeof ApiBrowserStatusRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
@@ -831,11 +944,17 @@ export interface FileRoutesById {
   '/api/gateway/sessions': typeof ApiGatewaySessionsRoute
   '/api/gateway/status': typeof ApiGatewayStatusRoute
   '/api/gateway/usage': typeof ApiGatewayUsageRoute
+  '/api/memory/list': typeof ApiMemoryListRoute
+  '/api/memory/read': typeof ApiMemoryReadRoute
+  '/api/memory/search': typeof ApiMemorySearchRoute
+  '/api/memory/write': typeof ApiMemoryWriteRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/tasks/$taskId': typeof ApiTasksTaskIdRoute
   '/api/tasks/': typeof ApiTasksIndexRoute
   '/api/cron/runs/$jobId': typeof ApiCronRunsJobIdRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/gateway/approvals/': typeof ApiGatewayApprovalsIndexRoute
+  '/api/gateway/approvals/$approvalId/$action': typeof ApiGatewayApprovalsApprovalIdActionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -848,6 +967,7 @@ export interface FileRouteTypes {
     | '/browser'
     | '/channels'
     | '/connect'
+    | '/costs'
     | '/cron'
     | '/dashboard'
     | '/debug'
@@ -864,6 +984,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/api/agent-activity'
+    | '/api/agent-dispatch'
     | '/api/agent-kill'
     | '/api/agent-pause'
     | '/api/agent-steer'
@@ -883,9 +1004,11 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-config'
     | '/api/gateway-discover'
+    | '/api/gateway-restart'
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
+    | '/api/ollama-health'
     | '/api/openclaw-update'
     | '/api/paths'
     | '/api/ping'
@@ -897,18 +1020,21 @@ export interface FileRouteTypes {
     | '/api/sessions'
     | '/api/skills'
     | '/api/stream'
+    | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/update-check'
     | '/api/usage'
+    | '/api/usage-analytics'
     | '/api/validate-provider'
     | '/api/workspace'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
+    | '/api/browser/navigate'
     | '/api/browser/screenshot'
     | '/api/browser/status'
     | '/api/browser/tabs'
@@ -926,11 +1052,17 @@ export interface FileRouteTypes {
     | '/api/gateway/sessions'
     | '/api/gateway/status'
     | '/api/gateway/usage'
+    | '/api/memory/list'
+    | '/api/memory/read'
+    | '/api/memory/search'
+    | '/api/memory/write'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
     | '/api/tasks/'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
+    | '/api/gateway/approvals/'
+    | '/api/gateway/approvals/$approvalId/$action'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -941,6 +1073,7 @@ export interface FileRouteTypes {
     | '/browser'
     | '/channels'
     | '/connect'
+    | '/costs'
     | '/cron'
     | '/dashboard'
     | '/debug'
@@ -956,6 +1089,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/api/agent-activity'
+    | '/api/agent-dispatch'
     | '/api/agent-kill'
     | '/api/agent-pause'
     | '/api/agent-steer'
@@ -975,9 +1109,11 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-config'
     | '/api/gateway-discover'
+    | '/api/gateway-restart'
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
+    | '/api/ollama-health'
     | '/api/openclaw-update'
     | '/api/paths'
     | '/api/ping'
@@ -989,18 +1125,21 @@ export interface FileRouteTypes {
     | '/api/sessions'
     | '/api/skills'
     | '/api/stream'
+    | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/update-check'
     | '/api/usage'
+    | '/api/usage-analytics'
     | '/api/validate-provider'
     | '/api/workspace'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat'
     | '/settings'
+    | '/api/browser/navigate'
     | '/api/browser/screenshot'
     | '/api/browser/status'
     | '/api/browser/tabs'
@@ -1018,11 +1157,17 @@ export interface FileRouteTypes {
     | '/api/gateway/sessions'
     | '/api/gateway/status'
     | '/api/gateway/usage'
+    | '/api/memory/list'
+    | '/api/memory/read'
+    | '/api/memory/search'
+    | '/api/memory/write'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
     | '/api/tasks'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
+    | '/api/gateway/approvals'
+    | '/api/gateway/approvals/$approvalId/$action'
   id:
     | '__root__'
     | '/'
@@ -1033,6 +1178,7 @@ export interface FileRouteTypes {
     | '/browser'
     | '/channels'
     | '/connect'
+    | '/costs'
     | '/cron'
     | '/dashboard'
     | '/debug'
@@ -1049,6 +1195,7 @@ export interface FileRouteTypes {
     | '/terminal'
     | '/usage'
     | '/api/agent-activity'
+    | '/api/agent-dispatch'
     | '/api/agent-kill'
     | '/api/agent-pause'
     | '/api/agent-steer'
@@ -1068,9 +1215,11 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-config'
     | '/api/gateway-discover'
+    | '/api/gateway-restart'
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
+    | '/api/ollama-health'
     | '/api/openclaw-update'
     | '/api/paths'
     | '/api/ping'
@@ -1082,18 +1231,21 @@ export interface FileRouteTypes {
     | '/api/sessions'
     | '/api/skills'
     | '/api/stream'
+    | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
     | '/api/update-check'
     | '/api/usage'
+    | '/api/usage-analytics'
     | '/api/validate-provider'
     | '/api/workspace'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
+    | '/api/browser/navigate'
     | '/api/browser/screenshot'
     | '/api/browser/status'
     | '/api/browser/tabs'
@@ -1111,11 +1263,17 @@ export interface FileRouteTypes {
     | '/api/gateway/sessions'
     | '/api/gateway/status'
     | '/api/gateway/usage'
+    | '/api/memory/list'
+    | '/api/memory/read'
+    | '/api/memory/search'
+    | '/api/memory/write'
     | '/api/sessions/send'
     | '/api/tasks/$taskId'
     | '/api/tasks/'
     | '/api/cron/runs/$jobId'
     | '/api/sessions/$sessionKey/status'
+    | '/api/gateway/approvals/'
+    | '/api/gateway/approvals/$approvalId/$action'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1127,6 +1285,7 @@ export interface RootRouteChildren {
   BrowserRoute: typeof BrowserRoute
   ChannelsRoute: typeof ChannelsRoute
   ConnectRoute: typeof ConnectRoute
+  CostsRoute: typeof CostsRoute
   CronRoute: typeof CronRoute
   DashboardRoute: typeof DashboardRoute
   DebugRoute: typeof DebugRoute
@@ -1143,6 +1302,7 @@ export interface RootRouteChildren {
   TerminalRoute: typeof TerminalRoute
   UsageRoute: typeof UsageRoute
   ApiAgentActivityRoute: typeof ApiAgentActivityRoute
+  ApiAgentDispatchRoute: typeof ApiAgentDispatchRoute
   ApiAgentKillRoute: typeof ApiAgentKillRoute
   ApiAgentPauseRoute: typeof ApiAgentPauseRoute
   ApiAgentSteerRoute: typeof ApiAgentSteerRoute
@@ -1162,9 +1322,11 @@ export interface RootRouteChildren {
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayConfigRoute: typeof ApiGatewayConfigRoute
   ApiGatewayDiscoverRoute: typeof ApiGatewayDiscoverRoute
+  ApiGatewayRestartRoute: typeof ApiGatewayRestartRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiModelSwitchRoute: typeof ApiModelSwitchRoute
   ApiModelsRoute: typeof ApiModelsRoute
+  ApiOllamaHealthRoute: typeof ApiOllamaHealthRoute
   ApiOpenclawUpdateRoute: typeof ApiOpenclawUpdateRoute
   ApiPathsRoute: typeof ApiPathsRoute
   ApiPingRoute: typeof ApiPingRoute
@@ -1176,12 +1338,14 @@ export interface RootRouteChildren {
   ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   ApiSkillsRoute: typeof ApiSkillsRoute
   ApiStreamRoute: typeof ApiStreamRoute
+  ApiSystemMetricsRoute: typeof ApiSystemMetricsRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
   ApiUpdateCheckRoute: typeof ApiUpdateCheckRoute
   ApiUsageRoute: typeof ApiUsageRoute
+  ApiUsageAnalyticsRoute: typeof ApiUsageAnalyticsRoute
   ApiValidateProviderRoute: typeof ApiValidateProviderRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
@@ -1194,8 +1358,14 @@ export interface RootRouteChildren {
   ApiGatewaySessionsRoute: typeof ApiGatewaySessionsRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiGatewayUsageRoute: typeof ApiGatewayUsageRoute
+  ApiMemoryListRoute: typeof ApiMemoryListRoute
+  ApiMemoryReadRoute: typeof ApiMemoryReadRoute
+  ApiMemorySearchRoute: typeof ApiMemorySearchRoute
+  ApiMemoryWriteRoute: typeof ApiMemoryWriteRoute
   ApiTasksTaskIdRoute: typeof ApiTasksTaskIdRoute
   ApiTasksIndexRoute: typeof ApiTasksIndexRoute
+  ApiGatewayApprovalsIndexRoute: typeof ApiGatewayApprovalsIndexRoute
+  ApiGatewayApprovalsApprovalIdActionRoute: typeof ApiGatewayApprovalsApprovalIdActionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1305,6 +1475,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CronRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/costs': {
+      id: '/costs'
+      path: '/costs'
+      fullPath: '/costs'
+      preLoaderRoute: typeof CostsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/connect': {
       id: '/connect'
       path: '/connect'
@@ -1403,6 +1580,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiValidateProviderRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/usage-analytics': {
+      id: '/api/usage-analytics'
+      path: '/api/usage-analytics'
+      fullPath: '/api/usage-analytics'
+      preLoaderRoute: typeof ApiUsageAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/usage': {
       id: '/api/usage'
       path: '/api/usage'
@@ -1443,6 +1627,13 @@ declare module '@tanstack/react-router' {
       path: '/api/terminal-close'
       fullPath: '/api/terminal-close'
       preLoaderRoute: typeof ApiTerminalCloseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/system-metrics': {
+      id: '/api/system-metrics'
+      path: '/api/system-metrics'
+      fullPath: '/api/system-metrics'
+      preLoaderRoute: typeof ApiSystemMetricsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/stream': {
@@ -1522,6 +1713,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOpenclawUpdateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/ollama-health': {
+      id: '/api/ollama-health'
+      path: '/api/ollama-health'
+      fullPath: '/api/ollama-health'
+      preLoaderRoute: typeof ApiOllamaHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/models': {
       id: '/api/models'
       path: '/api/models'
@@ -1541,6 +1739,13 @@ declare module '@tanstack/react-router' {
       path: '/api/history'
       fullPath: '/api/history'
       preLoaderRoute: typeof ApiHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gateway-restart': {
+      id: '/api/gateway-restart'
+      path: '/api/gateway-restart'
+      fullPath: '/api/gateway-restart'
+      preLoaderRoute: typeof ApiGatewayRestartRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/gateway-discover': {
@@ -1676,6 +1881,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAgentKillRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/agent-dispatch': {
+      id: '/api/agent-dispatch'
+      path: '/api/agent-dispatch'
+      fullPath: '/api/agent-dispatch'
+      preLoaderRoute: typeof ApiAgentDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/agent-activity': {
       id: '/api/agent-activity'
       path: '/api/agent-activity'
@@ -1703,6 +1915,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/sessions/send'
       preLoaderRoute: typeof ApiSessionsSendRouteImport
       parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/memory/write': {
+      id: '/api/memory/write'
+      path: '/api/memory/write'
+      fullPath: '/api/memory/write'
+      preLoaderRoute: typeof ApiMemoryWriteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/memory/search': {
+      id: '/api/memory/search'
+      path: '/api/memory/search'
+      fullPath: '/api/memory/search'
+      preLoaderRoute: typeof ApiMemorySearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/memory/read': {
+      id: '/api/memory/read'
+      path: '/api/memory/read'
+      fullPath: '/api/memory/read'
+      preLoaderRoute: typeof ApiMemoryReadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/memory/list': {
+      id: '/api/memory/list'
+      path: '/api/memory/list'
+      fullPath: '/api/memory/list'
+      preLoaderRoute: typeof ApiMemoryListRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/gateway/usage': {
       id: '/api/gateway/usage'
@@ -1823,6 +2063,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBrowserScreenshotRouteImport
       parentRoute: typeof ApiBrowserRoute
     }
+    '/api/browser/navigate': {
+      id: '/api/browser/navigate'
+      path: '/navigate'
+      fullPath: '/api/browser/navigate'
+      preLoaderRoute: typeof ApiBrowserNavigateRouteImport
+      parentRoute: typeof ApiBrowserRoute
+    }
+    '/api/gateway/approvals/': {
+      id: '/api/gateway/approvals/'
+      path: '/api/gateway/approvals'
+      fullPath: '/api/gateway/approvals/'
+      preLoaderRoute: typeof ApiGatewayApprovalsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -1836,6 +2090,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/cron/runs/$jobId'
       preLoaderRoute: typeof ApiCronRunsJobIdRouteImport
       parentRoute: typeof ApiCronRoute
+    }
+    '/api/gateway/approvals/$approvalId/$action': {
+      id: '/api/gateway/approvals/$approvalId/$action'
+      path: '/api/gateway/approvals/$approvalId/$action'
+      fullPath: '/api/gateway/approvals/$approvalId/$action'
+      preLoaderRoute: typeof ApiGatewayApprovalsApprovalIdActionRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -1855,12 +2116,14 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 )
 
 interface ApiBrowserRouteChildren {
+  ApiBrowserNavigateRoute: typeof ApiBrowserNavigateRoute
   ApiBrowserScreenshotRoute: typeof ApiBrowserScreenshotRoute
   ApiBrowserStatusRoute: typeof ApiBrowserStatusRoute
   ApiBrowserTabsRoute: typeof ApiBrowserTabsRoute
 }
 
 const ApiBrowserRouteChildren: ApiBrowserRouteChildren = {
+  ApiBrowserNavigateRoute: ApiBrowserNavigateRoute,
   ApiBrowserScreenshotRoute: ApiBrowserScreenshotRoute,
   ApiBrowserStatusRoute: ApiBrowserStatusRoute,
   ApiBrowserTabsRoute: ApiBrowserTabsRoute,
@@ -1926,6 +2189,7 @@ const rootRouteChildren: RootRouteChildren = {
   BrowserRoute: BrowserRoute,
   ChannelsRoute: ChannelsRoute,
   ConnectRoute: ConnectRoute,
+  CostsRoute: CostsRoute,
   CronRoute: CronRoute,
   DashboardRoute: DashboardRoute,
   DebugRoute: DebugRoute,
@@ -1942,6 +2206,7 @@ const rootRouteChildren: RootRouteChildren = {
   TerminalRoute: TerminalRoute,
   UsageRoute: UsageRoute,
   ApiAgentActivityRoute: ApiAgentActivityRoute,
+  ApiAgentDispatchRoute: ApiAgentDispatchRoute,
   ApiAgentKillRoute: ApiAgentKillRoute,
   ApiAgentPauseRoute: ApiAgentPauseRoute,
   ApiAgentSteerRoute: ApiAgentSteerRoute,
@@ -1961,9 +2226,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayConfigRoute: ApiGatewayConfigRoute,
   ApiGatewayDiscoverRoute: ApiGatewayDiscoverRoute,
+  ApiGatewayRestartRoute: ApiGatewayRestartRoute,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiModelSwitchRoute: ApiModelSwitchRoute,
   ApiModelsRoute: ApiModelsRoute,
+  ApiOllamaHealthRoute: ApiOllamaHealthRoute,
   ApiOpenclawUpdateRoute: ApiOpenclawUpdateRoute,
   ApiPathsRoute: ApiPathsRoute,
   ApiPingRoute: ApiPingRoute,
@@ -1975,12 +2242,14 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSessionsRoute: ApiSessionsRouteWithChildren,
   ApiSkillsRoute: ApiSkillsRoute,
   ApiStreamRoute: ApiStreamRoute,
+  ApiSystemMetricsRoute: ApiSystemMetricsRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
   ApiUpdateCheckRoute: ApiUpdateCheckRoute,
   ApiUsageRoute: ApiUsageRoute,
+  ApiUsageAnalyticsRoute: ApiUsageAnalyticsRoute,
   ApiValidateProviderRoute: ApiValidateProviderRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
@@ -1993,8 +2262,15 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGatewaySessionsRoute: ApiGatewaySessionsRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiGatewayUsageRoute: ApiGatewayUsageRoute,
+  ApiMemoryListRoute: ApiMemoryListRoute,
+  ApiMemoryReadRoute: ApiMemoryReadRoute,
+  ApiMemorySearchRoute: ApiMemorySearchRoute,
+  ApiMemoryWriteRoute: ApiMemoryWriteRoute,
   ApiTasksTaskIdRoute: ApiTasksTaskIdRoute,
   ApiTasksIndexRoute: ApiTasksIndexRoute,
+  ApiGatewayApprovalsIndexRoute: ApiGatewayApprovalsIndexRoute,
+  ApiGatewayApprovalsApprovalIdActionRoute:
+    ApiGatewayApprovalsApprovalIdActionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

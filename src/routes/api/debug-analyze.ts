@@ -1,10 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../server/auth-middleware'
 import { analyzeError, readOpenClawLogs } from '../../server/debug-analyzer'
 import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
+  requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
 
@@ -12,6 +14,11 @@ export const Route = createFileRoute('/api/debug-analyze')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
         const ip = getClientIp(request)
         if (!rateLimit(`debug:${ip}`, 10, 60_000)) {
           return rateLimitResponse()

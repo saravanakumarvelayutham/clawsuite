@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../server/gateway'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { requireJsonContentType } from '../../server/rate-limit'
 
 type SessionsListGatewayResponse = {
   sessions?: Array<Record<string, unknown>>
@@ -89,6 +90,11 @@ export const Route = createFileRoute('/api/sessions')({
         }
       },
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheckPost = requireJsonContentType(request)
+        if (csrfCheckPost) return csrfCheckPost
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,
@@ -103,21 +109,42 @@ export const Route = createFileRoute('/api/sessions')({
             typeof body.friendlyId === 'string' ? body.friendlyId.trim() : ''
           const friendlyId = requestedFriendlyId || randomUUID()
 
-          const params: Record<string, unknown> = { key: friendlyId }
-          if (label) params.label = label
+          const requestedModel =
+            typeof body.model === 'string' ? body.model.trim() : ''
+          const model = requestedModel || undefined
+
+          // Step 1: Create the session using friendlyId directly as the key.
+          const baseParams: Record<string, unknown> = { key: friendlyId }
+          if (label) baseParams.label = label
 
           const payload = await gatewayRpc<SessionsPatchResponse>(
             'sessions.patch',
-            params,
+            baseParams,
           )
 
-          const sessionKeyRaw = payload.key
-          const sessionKey =
-            typeof sessionKeyRaw === 'string' && sessionKeyRaw.trim().length > 0
-              ? sessionKeyRaw.trim()
+          const returnedKeyRaw = payload.key
+          const returnedKey =
+            typeof returnedKeyRaw === 'string' && returnedKeyRaw.trim().length > 0
+              ? returnedKeyRaw.trim()
               : ''
-          if (sessionKey.length === 0) {
+          const resolvedSessionKey = returnedKey || friendlyId
+          if (!resolvedSessionKey) {
             throw new Error('gateway returned an invalid response')
+          }
+
+          // Step 2: Apply model as a separate patch so model errors don't abort spawn.
+          let modelApplied = false
+          if (model) {
+            try {
+              await gatewayRpc<SessionsPatchResponse>('sessions.patch', {
+                key: resolvedSessionKey,
+                model,
+              })
+              modelApplied = true
+            } catch {
+              // Model not supported or invalid — session still usable with gateway default
+              modelApplied = false
+            }
           }
 
           // Register the friendly id so subsequent lookups resolve quickly.
@@ -129,9 +156,10 @@ export const Route = createFileRoute('/api/sessions')({
 
           return json({
             ok: true,
-            sessionKey,
+            sessionKey: resolvedSessionKey,
             friendlyId,
             entry: payload.entry,
+            modelApplied,
           })
         } catch (err) {
           return json(
@@ -144,6 +172,11 @@ export const Route = createFileRoute('/api/sessions')({
         }
       },
       PATCH: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheckPatch = requireJsonContentType(request)
+        if (csrfCheckPatch) return csrfCheckPatch
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,
@@ -205,6 +238,9 @@ export const Route = createFileRoute('/api/sessions')({
         }
       },
       DELETE: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const url = new URL(request.url)
           const rawSessionKey = url.searchParams.get('sessionKey') ?? ''

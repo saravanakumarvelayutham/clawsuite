@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../server/gateway'
 import { generateSessionTitle } from '@/utils/generate-session-title'
+import { isAuthenticated } from '@/server/auth-middleware'
+import { requireJsonContentType } from '@/server/rate-limit'
 
 const MAX_MESSAGES = 8
 const MAX_CHAR_PER_MESSAGE = 600
@@ -85,6 +87,11 @@ export const Route = createFileRoute('/api/session-title')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,

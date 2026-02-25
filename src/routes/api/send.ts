@@ -7,6 +7,7 @@ import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
+  requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -26,6 +27,81 @@ type SessionsResolveResponse = {
   key?: string
 }
 
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function readNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  return undefined
+}
+
+function stripDataUrlPrefix(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  const commaIndex = trimmed.indexOf(',')
+  if (trimmed.toLowerCase().startsWith('data:') && commaIndex >= 0) {
+    return trimmed.slice(commaIndex + 1).trim()
+  }
+  return trimmed
+}
+
+function normalizeAttachments(
+  attachments: unknown,
+): Array<Record<string, unknown>> | undefined {
+  if (!Array.isArray(attachments) || attachments.length === 0) {
+    return undefined
+  }
+
+  const normalized: Array<Record<string, unknown>> = []
+  for (const attachment of attachments) {
+    if (!attachment || typeof attachment !== 'object') continue
+    const source = attachment as Record<string, unknown>
+
+    const id = readString(source.id)
+    const name = readString(source.name) || readString(source.fileName)
+    const mimeType =
+      readString(source.contentType) ||
+      readString(source.mimeType) ||
+      readString(source.mediaType)
+    const size = readNumber(source.size)
+
+    const base64Raw =
+      readString(source.content) ||
+      readString(source.data) ||
+      readString(source.base64) ||
+      readString(source.dataUrl)
+    const content = stripDataUrlPrefix(base64Raw)
+
+    const type =
+      readString(source.type) ||
+      (mimeType.toLowerCase().startsWith('image/') ? 'image' : 'file')
+
+    if (!content) continue
+
+    const dataUrl =
+      readString(source.dataUrl) ||
+      (mimeType ? `data:${mimeType};base64,${content}` : '')
+
+    normalized.push({
+      id: id || undefined,
+      name: name || undefined,
+      fileName: name || undefined,
+      type,
+      contentType: mimeType || undefined,
+      mimeType: mimeType || undefined,
+      mediaType: mimeType || undefined,
+      content,
+      data: content,
+      base64: content,
+      dataUrl: dataUrl || undefined,
+      size,
+    })
+  }
+
+  return normalized.length > 0 ? normalized : undefined
+}
+
 export const Route = createFileRoute('/api/send')({
   server: {
     handlers: {
@@ -34,6 +110,8 @@ export const Route = createFileRoute('/api/send')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
 
         // Rate limit: 30 requests per minute per IP
         const ip = getClientIp(request)
@@ -56,7 +134,7 @@ export const Route = createFileRoute('/api/send')({
           const friendlyId = body.friendlyId
           const message = body.message
           const thinking = body.thinking
-          const attachments = body.attachments
+          const attachments = normalizeAttachments(body.attachments)
           const clientId = body.clientId
 
           if (!message.trim() && (!attachments || attachments.length === 0)) {

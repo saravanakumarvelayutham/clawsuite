@@ -19,6 +19,7 @@ export type StudioSettings = {
   preferredBudgetModel: string
   preferredPremiumModel: string
   onlySuggestCheaper: boolean
+  showSystemMetricsFooter: boolean
 }
 
 type SettingsState = {
@@ -40,6 +41,13 @@ export const defaultStudioSettings: StudioSettings = {
   preferredBudgetModel: '',
   preferredPremiumModel: '',
   onlySuggestCheaper: false,
+  showSystemMetricsFooter: false,
+}
+
+function resolveStoredAccent(value: string | null): AccentColor | null {
+  return value === 'purple' || value === 'blue' || value === 'green' || value === 'orange'
+    ? value
+    : null
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -102,11 +110,28 @@ export function applyTheme(theme: SettingsThemeMode) {
   if (theme === 'system' && media.matches) {
     root.classList.add('dark')
   }
+
+  // Sync data-theme so CSS variable overrides don't fight Tailwind dark: classes.
+  // paper-light CSS has !important overrides that win over dark: variants unless data-theme is correct.
+  const resolvedDark =
+    theme === 'dark' || (theme === 'system' && media.matches)
+  if (resolvedDark) {
+    // Preserve user's enterprise dark theme if set, otherwise default to ops-dark
+    const stored = localStorage.getItem('clawsuite-theme')
+    const darkThemes = ['ops-dark', 'premium-dark', 'sunset-brand']
+    root.setAttribute('data-theme', darkThemes.includes(stored ?? '') ? (stored as string) : 'ops-dark')
+  } else {
+    root.setAttribute('data-theme', 'paper-light')
+  }
+
+  const storedAccent = resolveStoredAccent(localStorage.getItem('clawsuite-accent')) || 'orange'
+  root.setAttribute('data-accent', storedAccent)
 }
 
 function applySettingsAppearance(settings: StudioSettings) {
   applyTheme(settings.theme)
-  applyAccentColor(settings.accentColor)
+  const storedAccent = resolveStoredAccent(localStorage.getItem('clawsuite-accent'))
+  applyAccentColor(storedAccent ?? settings.accentColor)
 }
 
 let didInitializeSettingsAppearance = false
@@ -116,6 +141,10 @@ export function initializeSettingsAppearance() {
   if (typeof window === 'undefined') return
 
   didInitializeSettingsAppearance = true
+
+  // Rehydrate persisted settings from localStorage (skipHydration: true requires manual call)
+  void useSettingsStore.persist.rehydrate()
+
   applySettingsAppearance(useSettingsStore.getState().settings)
 
   useSettingsStore.subscribe(
@@ -128,9 +157,9 @@ export function initializeSettingsAppearance() {
       }
 
       if (nextSettings.accentColor !== previousSettings.accentColor) {
+        localStorage.setItem('clawsuite-accent', nextSettings.accentColor)
         applyAccentColor(nextSettings.accentColor)
       }
     },
   )
 }
-

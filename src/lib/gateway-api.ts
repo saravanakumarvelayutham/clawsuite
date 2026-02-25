@@ -91,6 +91,11 @@ export type GatewayModelSwitchResponse = {
   [key: string]: unknown
 }
 
+export type GatewayModelDefaultResponse = {
+  ok?: boolean
+  error?: string
+}
+
 export type GatewayAgentActionResponse = {
   ok?: boolean
   error?: string
@@ -224,6 +229,46 @@ export async function switchModel(
   }
 }
 
+export async function setDefaultModel(
+  model: string,
+): Promise<GatewayModelDefaultResponse> {
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), 12000)
+
+  try {
+    const response = await fetch(makeEndpoint('/api/config-patch'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        raw: JSON.stringify({ defaultModel: model }, null, 2),
+        reason: 'Studio: set default model',
+      }),
+      signal: controller.signal,
+    })
+
+    const payload = (await response
+      .json()
+      .catch(() => ({}))) as GatewayModelDefaultResponse
+
+    if (!response.ok || payload.ok === false) {
+      const message =
+        typeof payload.error === 'string' && payload.error.trim().length > 0
+          ? payload.error
+          : response.statusText || 'Failed to persist default model'
+      throw new Error(message)
+    }
+
+    return payload
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new Error('Request timed out')
+    }
+    throw error
+  } finally {
+    globalThis.clearTimeout(timeout)
+  }
+}
+
 export async function steerAgent(
   sessionKey: string,
   message: string,
@@ -294,6 +339,62 @@ export async function killAgentSession(
       throw new Error('Request timed out')
     }
     throw error
+  } finally {
+    globalThis.clearTimeout(timeout)
+  }
+}
+
+// ── Gateway Approvals ─────────────────────────────────────────────────────────
+
+export type GatewayApprovalEntry = {
+  id: string
+  sessionKey?: string
+  agentName?: string
+  action?: string
+  context?: string
+  tool?: string
+  input?: unknown
+  requestedAt?: number
+  status?: 'pending' | 'approved' | 'denied'
+}
+
+export type GatewayApprovalsResponse = {
+  ok?: boolean
+  approvals?: GatewayApprovalEntry[]
+  pending?: GatewayApprovalEntry[]
+}
+
+export async function fetchGatewayApprovals(): Promise<GatewayApprovalsResponse> {
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), 6000)
+  try {
+    const response = await fetch(makeEndpoint('/api/gateway/approvals'), {
+      signal: controller.signal,
+    })
+    if (!response.ok) return { ok: false, approvals: [] }
+    return (await response.json()) as GatewayApprovalsResponse
+  } catch {
+    return { ok: false, approvals: [] }
+  } finally {
+    globalThis.clearTimeout(timeout)
+  }
+}
+
+export async function resolveGatewayApproval(
+  approvalId: string,
+  action: 'approve' | 'deny',
+): Promise<{ ok: boolean }> {
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), 8000)
+  try {
+    const response = await fetch(makeEndpoint(`/api/gateway/approvals/${approvalId}/${action}`), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      signal: controller.signal,
+    })
+    return { ok: response.ok }
+  } catch {
+    return { ok: false }
   } finally {
     globalThis.clearTimeout(timeout)
   }

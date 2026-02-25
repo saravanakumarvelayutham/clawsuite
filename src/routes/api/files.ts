@@ -5,10 +5,12 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { isAuthenticated } from '../../server/auth-middleware'
 import {
   getClientIp,
   rateLimit,
   rateLimitResponse,
+  requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
 
@@ -226,6 +228,9 @@ export const Route = createFileRoute('/api/files')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         try {
           const url = new URL(request.url)
           const action = url.searchParams.get('action') || 'list'
@@ -290,6 +295,9 @@ export const Route = createFileRoute('/api/files')({
         }
       },
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
         const ip = getClientIp(request)
         if (!rateLimit(`files:${ip}`, 30, 60_000)) {
           return rateLimitResponse()
@@ -297,6 +305,10 @@ export const Route = createFileRoute('/api/files')({
 
         try {
           const contentType = request.headers.get('content-type') || ''
+          if (!contentType.includes('multipart/form-data')) {
+            const csrfCheck = requireJsonContentType(request)
+            if (csrfCheck) return csrfCheck
+          }
           if (contentType.includes('multipart/form-data')) {
             const form = await request.formData()
             const action = String(form.get('action') || 'upload')

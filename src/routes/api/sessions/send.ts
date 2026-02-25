@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../../server/gateway'
+import { isAuthenticated } from '../../../server/auth-middleware'
+import { requireJsonContentType } from '../../../server/rate-limit'
 
 type SessionsResolveResponse = {
   ok?: boolean
@@ -52,6 +54,12 @@ export const Route = createFileRoute('/api/sessions/send')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+
         try {
           const body = (await request.json().catch(() => ({}))) as Record<
             string,

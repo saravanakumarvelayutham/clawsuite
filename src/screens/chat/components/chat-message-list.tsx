@@ -24,11 +24,16 @@ import {
 import { LoadingIndicator } from '@/components/loading-indicator'
 import { cn } from '@/lib/utils'
 
+/** Duration (ms) the thinking indicator stays visible after waitingForResponse
+ *  clears, giving the first response message time to render before the
+ *  indicator disappears — prevents a flash of blank space (Bug 2 fix). */
+const THINKING_GRACE_PERIOD_MS = 400
+
 // Simple thinking label — no cycling, no animation complexity
-function ThinkingStatusText() {
+function ThinkingStatusText({ elapsedSeconds }: { elapsedSeconds: number }) {
   return (
-    <span className="text-xs text-primary-500 font-medium">
-      Thinking…
+    <span className="text-xs text-primary-500 font-medium tabular-nums">
+      Thinking… {elapsedSeconds}s
     </span>
   )
 }
@@ -128,6 +133,7 @@ type ChatMessageListProps = {
   bottomOffset?: number | string
   keyboardInset?: number
   activeToolCalls?: Array<{ id: string; name: string; phase: string }>
+  liveToolActivity?: Array<{ name: string; timestamp: number }>
   hideSystemMessages?: boolean
 }
 
@@ -153,6 +159,7 @@ function ChatMessageListComponent({
   bottomOffset = 0,
   keyboardInset = 0,
   activeToolCalls = [],
+  liveToolActivity = [],
   hideSystemMessages = false,
 }: ChatMessageListProps) {
   const anchorRef = useRef<HTMLDivElement | null>(null)
@@ -170,6 +177,12 @@ function ChatMessageListComponent({
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
   const [expandAllToolSections, setExpandAllToolSections] = useState(false)
+  const [thinkingElapsedSeconds, setThinkingElapsedSeconds] = useState(0)
+
+  // Bug 2 fix: grace period — keep thinking indicator alive briefly after
+  // waitingForResponse clears so the response message has time to render.
+  const [thinkingGrace, setThinkingGrace] = useState(false)
+  const thinkingGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isMessageSearchOpen, setIsMessageSearchOpen] = useState(false)
   const [messageSearchValue, setMessageSearchValue] = useState('')
   const [activeSearchMatchIndex, setActiveSearchMatchIndex] = useState(0)
@@ -193,6 +206,11 @@ function ChatMessageListComponent({
     media.addEventListener('change', updateIsMobile)
     return () => media.removeEventListener('change', updateIsMobile)
   }, [])
+
+  // Bug 2 fix: refs used by grace-period effects (declared here so hooks run in
+  // consistent order; actual logic is after displayMessages useMemo below).
+  const prevWaitingRef = useRef(waitingForResponse)
+  const assistantMessageCountRef = useRef(0)
 
   // Pull-to-refresh handlers removed
 
@@ -288,27 +306,68 @@ function ChatMessageListComponent({
       return true
     })
 
-    const seenUserFingerprints = new Map<string, number>()
-    return filteredMessages.filter((message) => {
-      if (message.role !== 'user') return true
-
-      const trimmedText = textFromMessage(message).trim()
-      if (trimmedText.length === 0) return true
-
-      const fingerprint = `${message.role}:${trimmedText}`
-      const timestamp = getMessageTimestamp(message)
-      const previousTimestamp = seenUserFingerprints.get(fingerprint)
-      if (
-        typeof previousTimestamp === 'number' &&
-        Math.abs(timestamp - previousTimestamp) <= 5000
-      ) {
-        return false
+    const seenMessageIds = new Set<string>()
+    const deduped = filteredMessages.filter((message) => {
+      const messageId =
+        (message as any).id ||
+        (message as any).messageId ||
+        (message as any).clientId ||
+        (message as any).client_id ||
+        (message as any).nonce ||
+        (message as any).__optimisticId
+      if (typeof messageId !== 'string' || messageId.trim().length === 0) {
+        return true
       }
-
-      seenUserFingerprints.set(fingerprint, timestamp)
+      const scopedId = `${message.role}:${messageId.trim()}`
+      if (seenMessageIds.has(scopedId)) return false
+      seenMessageIds.add(scopedId)
       return true
     })
+    return deduped
   }, [hideSystemMessages, messages])
+
+  // Bug 2 fix: grace-period effects — placed after displayMessages so they can
+  // reference it safely.
+  useEffect(() => {
+    const currentAssistantCount = displayMessages.filter(
+      (m) => m.role === 'assistant',
+    ).length
+
+    // Cancel grace period early when a new assistant message appears
+    if (thinkingGrace && currentAssistantCount > assistantMessageCountRef.current) {
+      if (thinkingGraceTimerRef.current) {
+        clearTimeout(thinkingGraceTimerRef.current)
+        thinkingGraceTimerRef.current = null
+      }
+      setThinkingGrace(false)
+    }
+
+    assistantMessageCountRef.current = currentAssistantCount
+  }, [messages, thinkingGrace])
+
+  useEffect(() => {
+    const wasWaiting = prevWaitingRef.current
+    prevWaitingRef.current = waitingForResponse
+
+    if (wasWaiting && !waitingForResponse) {
+      // Snapshot assistant count at the moment waiting cleared
+      assistantMessageCountRef.current = displayMessages.filter(
+        (m) => m.role === 'assistant',
+      ).length
+      setThinkingGrace(true)
+      if (thinkingGraceTimerRef.current) clearTimeout(thinkingGraceTimerRef.current)
+      thinkingGraceTimerRef.current = setTimeout(() => {
+        thinkingGraceTimerRef.current = null
+        setThinkingGrace(false)
+      }, THINKING_GRACE_PERIOD_MS)
+    }
+
+    return () => {
+      if (thinkingGraceTimerRef.current) {
+        clearTimeout(thinkingGraceTimerRef.current)
+      }
+    }
+  }, [waitingForResponse]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const normalizedMessageSearch = useMemo(
     function getNormalizedMessageSearch() {
@@ -510,9 +569,13 @@ function ChatMessageListComponent({
     .filter(({ message }) => message.role === 'user')
     .map(({ index }) => index)
     .pop()
-  // Show typing indicator when waiting for response and no visible text yet
+  // Show typing indicator when waiting for response and no visible text yet.
+  // Bug 2 fix: also show during grace period (thinkingGrace) so there's no
+  // blank-space flash between waitingForResponse clearing and the response
+  // message actually rendering.
   const showTypingIndicator = (() => {
-    if (!waitingForResponse) return false
+    const effectivelyWaiting = waitingForResponse || thinkingGrace
+    if (!effectivelyWaiting) return false
     // If streaming has visible text, hide indicator
     if (isStreaming && streamingText && streamingText.length > 0) return false
     const lastMessage = displayMessages[displayMessages.length - 1]
@@ -527,6 +590,25 @@ function ChatMessageListComponent({
     }
     return true
   })()
+
+  const showThinkingTimer =
+    showTypingIndicator &&
+    liveToolActivity.length === 0 &&
+    activeToolCalls.length === 0 &&
+    !(isStreaming && streamingText && streamingText.length > 0)
+
+  useEffect(() => {
+    if (!showThinkingTimer) {
+      setThinkingElapsedSeconds(0)
+      return
+    }
+    setThinkingElapsedSeconds(0)
+    const startedAt = Date.now()
+    const timer = window.setInterval(() => {
+      setThinkingElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000))
+    }, 250)
+    return () => window.clearInterval(timer)
+  }, [showThinkingTimer])
 
   // Pin the last user+assistant group without adding bottom padding.
   const groupStartIndex = typeof lastUserIndex === 'number' ? lastUserIndex : -1
@@ -639,10 +721,9 @@ function ChatMessageListComponent({
     const sessionChanged = prevSessionKeyRef.current !== sessionKey
     prevSessionKeyRef.current = sessionKey
 
-    // Always scroll on session change
+    // Always scroll on session change (instant)
     if (sessionChanged) {
       stickToBottomRef.current = true
-      // Use requestAnimationFrame to ensure DOM has updated
       frameId = window.requestAnimationFrame(() => scrollToBottom('auto'))
       return () => {
         if (frameId !== null) window.cancelAnimationFrame(frameId)
@@ -651,13 +732,23 @@ function ChatMessageListComponent({
 
     // Scroll to bottom if sticking
     if (stickToBottomRef.current) {
-      frameId = window.requestAnimationFrame(() => scrollToBottom('auto'))
+      // Use smooth scroll only when user is near bottom (<200px) and new messages arrive;
+      // use instant scroll during streaming to avoid choppiness.
+      const behavior: ScrollBehavior = isNearBottomRef.current && !isStreaming ? 'smooth' : 'auto'
+      frameId = window.requestAnimationFrame(() => scrollToBottom(behavior))
     }
 
     return () => {
       if (frameId !== null) window.cancelAnimationFrame(frameId)
     }
-  }, [loading, displayMessages.length, sessionKey, scrollToBottom])
+  }, [
+    loading,
+    displayMessages.length,
+    isStreaming,
+    sessionKey,
+    scrollToBottom,
+    streamingText,
+  ])
 
   useEffect(() => {
     setExpandAllToolSections(false)
@@ -832,7 +923,7 @@ function ChatMessageListComponent({
   return (
     // mt-2 is to fix the prompt-input cut off
     <ChatContainerRoot
-      className="flex-1 min-h-0 overflow-y-auto"
+      className="h-full flex-1 min-h-0"
       stickToBottom={stickToBottomRef.current}
       onUserScroll={handleUserScroll}
       overlay={scrollToBottomOverlay}
@@ -846,10 +937,10 @@ function ChatMessageListComponent({
               value={messageSearchValue}
               onChange={(e) => setMessageSearchValue(e.target.value)}
               placeholder="Search messages..."
-              className="min-w-0 flex-1 rounded-md border border-primary-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2.5 py-1.5 text-sm text-primary-900 dark:text-gray-100 outline-none placeholder:text-primary-400 dark:placeholder:text-gray-500 focus:border-primary-400 dark:focus:border-primary-500 focus:ring-1 focus:ring-primary-400 dark:focus:ring-primary-500"
+              className="min-w-0 flex-1 rounded-md border border-primary-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1.5 text-sm text-primary-900 dark:text-neutral-100 outline-none placeholder:text-primary-400 dark:placeholder:text-neutral-500 focus:border-primary-400 dark:focus:border-primary-500 focus:ring-1 focus:ring-primary-400 dark:focus:ring-primary-500"
             />
             {isMessageSearchActive && (
-              <span className="shrink-0 text-xs text-primary-500 dark:text-gray-400">
+              <span className="shrink-0 text-xs text-primary-500 dark:text-neutral-400">
                 {messageSearchMatches.length > 0
                   ? `${activeSearchMatchIndex + 1} of ${messageSearchMatches.length}`
                   : 'No matches'}
@@ -860,7 +951,7 @@ function ChatMessageListComponent({
                 type="button"
                 onClick={jumpToPreviousMatch}
                 disabled={messageSearchMatches.length === 0}
-                className="rounded p-1 text-primary-500 dark:text-gray-400 hover:bg-primary-200 dark:hover:bg-gray-800 hover:text-primary-700 dark:hover:text-gray-200 disabled:opacity-30"
+                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
                 aria-label="Previous match"
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -877,7 +968,7 @@ function ChatMessageListComponent({
                 type="button"
                 onClick={jumpToNextMatch}
                 disabled={messageSearchMatches.length === 0}
-                className="rounded p-1 text-primary-500 dark:text-gray-400 hover:bg-primary-200 dark:hover:bg-gray-800 hover:text-primary-700 dark:hover:text-gray-200 disabled:opacity-30"
+                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200 disabled:opacity-30"
                 aria-label="Next match"
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -893,7 +984,7 @@ function ChatMessageListComponent({
               <button
                 type="button"
                 onClick={closeMessageSearch}
-                className="rounded p-1 text-primary-500 dark:text-gray-400 hover:bg-primary-200 dark:hover:bg-gray-800 hover:text-primary-700 dark:hover:text-gray-200"
+                className="rounded p-1 text-primary-500 dark:text-neutral-400 hover:bg-primary-200 dark:hover:bg-primary-800 hover:text-primary-700 dark:hover:text-neutral-200"
                 aria-label="Close search"
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -940,7 +1031,7 @@ function ChatMessageListComponent({
                     'shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
                     expandAllToolSections
                       ? 'border-amber-300 bg-amber-100 text-amber-700 cursor-default'
-                      : 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 hover:border-amber-400',
+                      : 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200 dark:hover:bg-amber-900/30 hover:border-amber-400',
                   )}
                   aria-label={
                     expandAllToolSections
@@ -1058,13 +1149,35 @@ function ChatMessageListComponent({
               ) : null}
             </>
           )}
-          {showTypingIndicator || (isStreaming && activeToolCalls.length > 0) ? (
+          {showTypingIndicator ||
+          liveToolActivity.length > 0 ||
+          (isStreaming && !streamingText) ||
+          (isStreaming && activeToolCalls.length > 0) ? (
             <div
               className="flex flex-col gap-1 py-1.5 px-1 animate-in fade-in duration-300 md:gap-1.5 md:py-2"
               role="status"
               aria-live="polite"
             >
-              {activeToolCalls.length > 0 ? (
+              {liveToolActivity.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {liveToolActivity.map((tool, index) => (
+                    <span
+                      key={tool.name}
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                        index === 0
+                          ? 'animate-pulse border-accent-200 bg-accent-50 text-accent-700 dark:border-accent-800 dark:bg-accent-950/40 dark:text-accent-400'
+                          : 'border-neutral-200 bg-neutral-100 text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
+                      )}
+                    >
+                      {getToolIcon(tool.name)} {tool.name}
+                      {index === 0 ? (
+                        <span className="ml-0.5 opacity-60">···</span>
+                      ) : null}
+                    </span>
+                  ))}
+                </div>
+              ) : activeToolCalls.length > 0 ? (
                 activeToolCalls.map((tool) => (
                   <div key={tool.id} className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
                     <div className="size-5 rounded-full bg-accent-100 flex items-center justify-center shrink-0">
@@ -1084,7 +1197,7 @@ function ChatMessageListComponent({
                       ariaLabel="Assistant is working"
                       className="!ml-0"
                     />
-                  <ThinkingStatusText />
+                  <ThinkingStatusText elapsedSeconds={thinkingElapsedSeconds} />
                 </div>
               )}
             </div>
@@ -1208,6 +1321,7 @@ function areChatMessageListEqual(
     prev.bottomOffset === next.bottomOffset &&
     prev.keyboardInset === next.keyboardInset &&
     prev.activeToolCalls === next.activeToolCalls &&
+    prev.liveToolActivity === next.liveToolActivity &&
     prev.hideSystemMessages === next.hideSystemMessages
   )
 }

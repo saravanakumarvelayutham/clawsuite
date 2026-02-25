@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
 import { applyTheme, useSettings } from '@/hooks/use-settings'
+import type { ThemeId } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   getChatProfileDisplayName,
@@ -39,6 +40,143 @@ import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
 export const Route = createFileRoute('/settings/')({
   component: SettingsRoute,
 })
+
+// ── Enterprise Theme Picker (P1-2) ─────────────────────────────────────
+
+const ENTERPRISE_THEMES_PAGE = [
+  {
+    id: 'paper-light' as ThemeId,
+    label: 'Clean',
+    icon: '☀️',
+    desc: 'Warm gray canvas with white cards',
+    preview: { bg: '#f5f5f5', panel: '#ffffff', border: '#e5e5e5', accent: '#f97316', text: '#1a1a1a' },
+  },
+  {
+    id: 'ops-dark' as ThemeId,
+    label: 'Slate',
+    icon: '🖥️',
+    desc: 'Deep slate with teal secondary glow',
+    preview: { bg: '#1e1e2e', panel: '#2a2a3e', border: '#3a3a4e', accent: '#14b8a6', text: '#e5e5e5' },
+  },
+  {
+    id: 'premium-dark' as ThemeId,
+    label: 'Midnight',
+    icon: '✨',
+    desc: 'OLED true black with high contrast',
+    preview: { bg: '#000000', panel: '#0a0a0a', border: '#1a1a1a', accent: '#f97316', text: '#f5f5f5' },
+  },
+  {
+    id: 'sunset-brand' as ThemeId,
+    label: 'Sunset',
+    icon: '🌇',
+    desc: 'Warm brown brand immersion',
+    preview: { bg: '#1a0e05', panel: '#2a1a0e', border: '#6b3c1b', accent: '#f59e0b', text: '#ffe7d1' },
+  },
+] as const
+
+const DARK_ENTERPRISE_SET = new Set<ThemeId>(['ops-dark', 'premium-dark', 'sunset-brand'])
+
+function PageThemeSwatch({
+  colors,
+}: {
+  colors: (typeof ENTERPRISE_THEMES_PAGE)[number]['preview']
+}) {
+  return (
+    <div
+      className="flex h-10 w-full overflow-hidden rounded-md border"
+      style={{ borderColor: colors.border, backgroundColor: colors.bg }}
+    >
+      <div
+        className="flex h-full w-4 flex-col gap-0.5 p-0.5"
+        style={{ backgroundColor: colors.panel }}
+      >
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="h-1.5 w-full rounded-sm"
+            style={{ backgroundColor: colors.border }}
+          />
+        ))}
+      </div>
+      <div className="flex flex-1 flex-col gap-0.5 p-1">
+        <div
+          className="h-1.5 w-3/4 rounded"
+          style={{ backgroundColor: colors.text, opacity: 0.8 }}
+        />
+        <div
+          className="h-1 w-1/2 rounded"
+          style={{ backgroundColor: colors.text, opacity: 0.3 }}
+        />
+        <div
+          className="mt-0.5 h-1.5 w-6 rounded-full"
+          style={{ backgroundColor: colors.accent }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function EnterpriseThemePickerPage() {
+  const { updateSettings } = useSettings()
+  const [current, setCurrent] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'paper-light'
+    const stored = localStorage.getItem('clawsuite-theme')
+    return ENTERPRISE_THEMES_PAGE.some((t) => t.id === stored) ? (stored as string) : 'paper-light'
+  })
+
+  function applyEnterpriseTheme(id: ThemeId) {
+    const html = document.documentElement
+    html.setAttribute('data-theme', id)
+    if (DARK_ENTERPRISE_SET.has(id)) {
+      html.classList.add('dark')
+      html.classList.remove('light')
+      updateSettings({ theme: 'dark' })
+    } else {
+      html.classList.add('light')
+      html.classList.remove('dark')
+      updateSettings({ theme: 'light' })
+    }
+    localStorage.setItem('clawsuite-theme', id)
+    setCurrent(id)
+  }
+
+  return (
+    <div className="grid w-full grid-cols-2 gap-2">
+      {ENTERPRISE_THEMES_PAGE.map((t) => {
+        const isActive = current === t.id
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => applyEnterpriseTheme(t.id)}
+            className={cn(
+              'flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors',
+              isActive
+                ? 'border-accent-500 bg-accent-50 text-accent-700'
+                : 'border-primary-200 bg-primary-50/80 hover:bg-primary-100',
+            )}
+          >
+            <PageThemeSwatch colors={t.preview} />
+            <div className="flex items-center gap-1">
+              <span className="text-xs">{t.icon}</span>
+              <span className="text-xs font-semibold text-primary-900 dark:text-neutral-100">
+                {t.label}
+              </span>
+              {isActive && (
+                <span className="ml-auto text-[9px] font-bold uppercase tracking-wide text-accent-600">
+                  Active
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] leading-tight text-primary-500 dark:text-neutral-400">
+              {t.desc}
+            </p>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 type SectionProps = {
   title: string
@@ -116,6 +254,7 @@ function SettingsRoute() {
   usePageTitle('Settings')
   const { settings, updateSettings } = useSettings()
   const gatewaySetup = useGatewaySetupStore()
+  const [gatewayUrlInput, setGatewayUrlInput] = useState(settings.gatewayUrl)
   const [connectionStatus, setConnectionStatus] = useState<
     'idle' | 'testing' | 'connected' | 'failed'
   >('idle')
@@ -151,6 +290,10 @@ function SettingsRoute() {
     void fetchModels()
   }, [])
 
+  useEffect(() => {
+    setGatewayUrlInput(settings.gatewayUrl)
+  }, [settings.gatewayUrl])
+
   async function handleTestConnection() {
     setConnectionStatus('testing')
 
@@ -168,24 +311,39 @@ function SettingsRoute() {
     }
   }
 
-  function validateAndUpdateUrl(value: string) {
-    if (value && value.length > 0) {
-      try {
-        new URL(value)
-        setUrlError(null)
-      } catch {
-        setUrlError('Invalid URL format')
-      }
-    } else {
-      setUrlError(null)
+  function validateGatewayUrl(value: string): string | null {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    try {
+      new URL(trimmed)
+      return null
+    } catch {
+      return 'Invalid URL format'
     }
-    updateSettings({ gatewayUrl: value })
+  }
+
+  function persistGatewayUrl(value: string) {
+    const error = validateGatewayUrl(value)
+    setUrlError(error)
+    if (error) return
+    updateSettings({ gatewayUrl: value.trim() })
   }
 
   function handleThemeChange(value: string) {
     const theme = value as SettingsThemeMode
     applyTheme(theme)
     updateSettings({ theme })
+
+    // P1-1: Persist enterprise theme to localStorage, mirroring settings-dialog behaviour
+    if (theme === 'light') {
+      localStorage.setItem('clawsuite-theme', 'paper-light')
+    } else if (theme === 'dark') {
+      const current = localStorage.getItem('clawsuite-theme')
+      const darkThemes = ['ops-dark', 'premium-dark', 'sunset-brand']
+      if (!darkThemes.includes(current ?? '')) {
+        localStorage.setItem('clawsuite-theme', 'ops-dark')
+      }
+    }
   }
 
   function getAccentBadgeClass(color: AccentColor): string {
@@ -345,6 +503,16 @@ function SettingsRoute() {
                     )}
                   </div>
                 </SettingsRow>
+
+                {/* P1-2: Enterprise theme picker — mobile-only settings UI needs this */}
+                <SettingsRow
+                  label="Enterprise theme"
+                  description="Full brand theme presets with custom color palettes."
+                >
+                  <div className="w-full">
+                    <EnterpriseThemePickerPage />
+                  </div>
+                </SettingsRow>
               </SettingsSection>
               <LoaderStyleSection />
             </>
@@ -474,8 +642,21 @@ function SettingsRoute() {
                     <input
                       type="url"
                       placeholder="https://api.openclaw.ai"
-                      value={settings.gatewayUrl}
-                      onChange={(e) => validateAndUpdateUrl(e.target.value)}
+                      value={gatewayUrlInput}
+                      onChange={(e) => {
+                        const nextValue = e.target.value
+                        setGatewayUrlInput(nextValue)
+                        if (urlError) {
+                          setUrlError(validateGatewayUrl(nextValue))
+                        }
+                      }}
+                      onBlur={(e) => persistGatewayUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter') return
+                        e.preventDefault()
+                        persistGatewayUrl((e.target as HTMLInputElement).value)
+                        ;(e.target as HTMLInputElement).blur()
+                      }}
                       className="h-9 w-full rounded-lg border border-primary-200 dark:border-gray-600 bg-primary-50 dark:bg-gray-800 px-3 text-sm text-primary-900 dark:text-gray-100 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-400 dark:focus-visible:ring-primary-500"
                       aria-label="Gateway URL"
                       aria-invalid={!!urlError}

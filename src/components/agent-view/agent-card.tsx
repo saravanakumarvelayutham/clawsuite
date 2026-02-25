@@ -4,12 +4,8 @@ import {
   ArrowLeft01Icon,
   Cancel01Icon,
   CheckmarkCircle01Icon,
-  Clock01Icon,
-  CoinsDollarIcon,
   Delete02Icon,
   EyeIcon,
-  KeyIcon,
-  AiBrain01Icon,
   MoreVerticalIcon,
   PauseIcon,
   PlayIcon,
@@ -316,6 +312,9 @@ export function AgentCard({
     </>
   ) : null
 
+  const compactModelLabel =
+    node.model.length > 20 ? `${node.model.slice(0, 19)}…` : node.model
+
   // Detail panel view
   if (showDetail) {
     return (
@@ -328,128 +327,67 @@ export function AgentCard({
         className={cn(
           'group relative overflow-visible rounded-3xl border border-primary-300/80 bg-primary-100/70 shadow-md backdrop-blur-sm',
           'w-full p-3',
+          isCompact ? 'col-span-2' : '',
           className,
         )}
       >
-        {/* Header with back button */}
-        <div className="flex items-center gap-2 mb-3">
+        <div className="mb-3 flex items-center gap-2">
           <Button
-            variant="ghost"
-            size="icon-sm"
-            className="size-7 rounded-full"
+            variant="outline"
+            size="sm"
+            className="h-7 rounded-full px-2"
             onClick={() => setShowDetail(false)}
           >
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.5} />
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={14} strokeWidth={1.5} />
+            Back
           </Button>
-          <h4 className="flex-1 truncate font-medium text-primary-900 text-sm">
-            {node.name}
-          </h4>
-          <span
-            className={cn(
-              'rounded-full px-2 py-0.5 font-medium tabular-nums ring-1 text-[10px]',
-              getModelBadgeClassName(node.model),
-            )}
-          >
-            {node.model}
-          </span>
-          {renderWardenMenu('size-7 rounded-full')}
-        </div>
-
-        {/* Full task description */}
-        <div className="mb-3 rounded-xl border border-primary-300/60 bg-primary-200/30 p-2.5">
-          <p className="text-[11px] font-medium text-primary-700 mb-1">Task</p>
-          <p className="text-[12px] text-primary-800 leading-relaxed">
-            {node.task}
-          </p>
-        </div>
-
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="rounded-lg border border-primary-300/60 bg-primary-200/30 p-2">
-            <div className="flex items-center gap-1.5 text-primary-600 mb-0.5">
-              <HugeiconsIcon icon={Clock01Icon} size={14} strokeWidth={1.5} />
-              <span className="text-[9px] font-medium">Runtime</span>
-            </div>
-            <p className="text-[13px] font-mono text-primary-900">
-              {formatRuntime(node.runtimeSeconds)}
-            </p>
-          </div>
-          <div className="rounded-lg border border-primary-300/60 bg-primary-200/30 p-2">
-            <div className="flex items-center gap-1.5 text-primary-600 mb-0.5">
-              <HugeiconsIcon icon={AiChat01Icon} size={14} strokeWidth={1.5} />
-              <span className="text-[9px] font-medium">Tokens</span>
-            </div>
-            <p className="text-[13px] font-mono text-primary-900">
-              {node.tokenCount.toLocaleString()}
-            </p>
-          </div>
-          <div className="rounded-lg border border-primary-300/60 bg-primary-200/30 p-2">
-            <div className="flex items-center gap-1.5 text-primary-600 mb-0.5">
-              <HugeiconsIcon
-                icon={CoinsDollarIcon}
-                size={14}
-                strokeWidth={1.5}
-              />
-              <span className="text-[9px] font-medium">Cost</span>
-            </div>
-            <p className="text-[13px] font-mono text-primary-900">
-              {formatCost(node.cost)}
-            </p>
-          </div>
-          <div className="rounded-lg border border-primary-300/60 bg-primary-200/30 p-2">
-            <div className="flex items-center gap-1.5 text-primary-600 mb-0.5">
-              <HugeiconsIcon icon={AiBrain01Icon} size={14} strokeWidth={1.5} />
-              <span className="text-[9px] font-medium">Model</span>
-            </div>
-            <p className="text-[13px] font-mono text-primary-900 truncate">
+          <div className="min-w-0 flex-1">
+            <h4 className="truncate text-sm font-medium text-primary-900" title={node.name}>
+              {node.name}
+            </h4>
+            <p className="mt-0.5 text-[11px] font-mono text-primary-700">
               {node.model}
             </p>
           </div>
+          <span className="inline-flex size-2 shrink-0 rounded-full bg-emerald-500" />
+          {renderWardenMenu('size-7 rounded-full')}
         </div>
 
-        {/* Session key */}
-        {node.sessionKey ? (
-          <div className="mb-3 rounded-lg border border-primary-300/60 bg-primary-200/30 p-2">
-            <div className="flex items-center gap-1.5 text-primary-600 mb-0.5">
-              <HugeiconsIcon icon={KeyIcon} size={14} strokeWidth={1.5} />
-              <span className="text-[9px] font-medium">Session Key</span>
-            </div>
-            <p className="text-[11px] font-mono text-primary-700 truncate">
-              {node.sessionKey}
-            </p>
-          </div>
-        ) : null}
+        {/* Status + model row */}
+        <div className="mb-3 flex items-center gap-2 rounded-xl border border-primary-300/60 bg-primary-200/30 p-2.5">
+          <span
+            className={cn(
+              'inline-flex size-2 shrink-0 rounded-full',
+              node.status === 'failed' ? 'bg-red-400' :
+              node.status === 'thinking' ? 'bg-accent-400 animate-pulse' :
+              node.status === 'complete' ? 'bg-emerald-400' :
+              node.status === 'queued' ? 'bg-primary-500' :
+              'bg-emerald-400 animate-pulse',
+            )}
+          />
+          <span className={cn('text-[11px] font-medium capitalize', getStatusTextClassName(node.status))}>
+            {getStatusLabel(node.status)}
+          </span>
+          <span className="ml-auto font-mono text-[10px] text-primary-600 truncate max-w-[120px]">
+            {node.model.split('/').pop()}
+          </span>
+        </div>
 
-        {/* Progress bar */}
-        <div className="mb-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] text-primary-600">Progress</span>
-            <span
-              className={cn(
-                'text-[10px] font-medium tabular-nums',
-                getStatusTextClassName(node.status),
-              )}
-            >
-              {node.progress}% · {getStatusLabel(node.status)}
-            </span>
-          </div>
-          <div className="h-2 rounded-full bg-primary-300/50 overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${node.progress}%` }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              className={cn(
-                'h-full rounded-full',
-                node.status === 'complete'
-                  ? 'bg-emerald-500'
-                  : node.status === 'failed'
-                    ? 'bg-red-500'
-                    : node.status === 'thinking'
-                      ? 'bg-accent-500'
-                      : 'bg-emerald-500',
-              )}
-            />
-          </div>
+        {/* Last output / task preview */}
+        <div className="mb-3 rounded-xl border border-primary-300/60 bg-primary-200/30 p-2.5">
+          <p className="mb-1 text-[10px] font-medium text-primary-600">Last message</p>
+          <p className="text-[11px] leading-relaxed text-primary-800">
+            {node.task.length > 80 ? `${node.task.slice(0, 80)}…` : node.task}
+          </p>
+        </div>
+
+        {/* Compact stats */}
+        <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary-300/60 bg-primary-200/30 px-2.5 py-2 text-[10px] tabular-nums text-primary-600">
+          <span>{formatRuntime(node.runtimeSeconds)}</span>
+          <span className="text-primary-300">·</span>
+          <span>{node.tokenCount.toLocaleString()} tok</span>
+          <span className="text-primary-300">·</span>
+          <span>${node.cost.toFixed(2)}</span>
         </div>
 
         {/* Actions */}
@@ -459,29 +397,32 @@ export function AgentCard({
               <Button
                 variant="secondary"
                 size="sm"
-                className="flex-1 h-8 justify-center"
+                className="h-8 flex-1 justify-center"
                 onClick={() => onChat(node.id)}
               >
-                <HugeiconsIcon
-                  icon={AiChat01Icon}
-                  size={16}
-                  strokeWidth={1.5}
-                />
-                Chat
+                <HugeiconsIcon icon={EyeIcon} size={16} strokeWidth={1.5} />
+                View Output
+              </Button>
+            ) : null}
+            {(node.status === 'running' || node.status === 'thinking') && onKill ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-3 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
+                onClick={() => setKillConfirmOpen(true)}
+              >
+                <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.5} />
+                Kill
               </Button>
             ) : null}
             {node.status === 'queued' ? (
               <Button
                 variant="ghost"
                 size="sm"
-                className="flex-1 h-8 justify-center"
+                className="h-8 flex-1 justify-center"
                 onClick={() => onCancel?.(node.id)}
               >
-                <HugeiconsIcon
-                  icon={Cancel01Icon}
-                  size={16}
-                  strokeWidth={1.5}
-                />
+                <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.5} />
                 Cancel
               </Button>
             ) : null}
@@ -506,120 +447,109 @@ export function AgentCard({
         x: { duration: 0.3, ease: 'easeOut' },
       }}
       className={cn(
-        'group relative overflow-hidden rounded-3xl border border-primary-300/80 bg-primary-100/70 shadow-md backdrop-blur-sm',
-        isCompact ? 'w-full rounded-xl p-1.5' : 'w-full p-2.5',
+        'group relative rounded-3xl border border-primary-300/80 bg-primary-100/70 shadow-md backdrop-blur-sm',
+        isCompact
+          ? 'w-full min-w-0 overflow-visible rounded-xl p-2'
+          : 'w-full overflow-hidden p-2.5',
         node.status === 'complete' ? 'opacity-50' : 'opacity-100',
         node.status === 'failed' ? 'shadow-red-600/35' : '',
         className,
       )}
     >
-      {/* Compact mode: vertical layout */}
+      {/* Compact mode: horizontal layout */}
       {isCompact ? (
         <>
-          <div className="flex items-center justify-between gap-1.5 mb-0.5">
-            <span
-              className={cn(
-                'rounded-full px-1.5 py-0.5 font-medium tabular-nums ring-1 text-[8px]',
-                getModelBadgeClassName(node.model),
-              )}
-            >
-              {node.model}
-            </span>
-            <div className="inline-flex items-center gap-1 ml-auto">
-              {node.isLive ? (
-                <motion.span
-                  aria-hidden
-                  animate={{ opacity: [0.5, 1, 0.5], scale: [1, 1.15, 1] }}
-                  transition={{
-                    duration: 1.4,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
-                  }}
-                  className="size-1.5 rounded-full bg-emerald-400"
-                />
-              ) : null}
-              <span
-                className={cn(
-                  'font-medium text-balance tabular-nums text-[9px]',
-                  getStatusTextClassName(node.status),
-                )}
-              >
-                {getStatusLabel(node.status)}
-              </span>
-            </div>
-            {renderWardenMenu('size-6 rounded-md')}
-          </div>
-
-          <div className="relative mx-auto mb-1 size-10">
-            <div className="relative flex size-10 items-center justify-center">
-              {/* Mini progress ring */}
-              <svg
-                className="absolute inset-0 size-10 -rotate-90"
-                viewBox="0 0 40 40"
-              >
-                <circle
-                  cx="20"
-                  cy="20"
-                  r="17"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="text-primary-300/40"
-                />
-                <circle
-                  cx="20"
-                  cy="20"
-                  r="17"
-                  fill="none"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeDasharray={`${(node.progress / 100) * 106.8} 106.8`}
-                  className={cn(
-                    node.status === 'complete'
-                      ? 'text-emerald-400'
-                      : node.status === 'failed'
-                        ? 'text-red-400'
-                        : node.status === 'thinking'
-                          ? 'text-accent-400'
-                          : 'text-emerald-400',
-                  )}
-                  stroke="currentColor"
-                />
-              </svg>
-              <div className="flex size-7 items-center justify-center rounded-full border border-primary-300/70 bg-primary-200/80">
+          <div className="flex items-start gap-2.5 overflow-visible">
+            <div className="relative mt-0.5 size-10 shrink-0 cursor-default">
+              <AgentProgress
+                value={node.progress}
+                status={node.status}
+                size={40}
+                strokeWidth={2.5}
+                className="absolute inset-0"
+              />
+              <div className="absolute inset-1 inline-flex items-center justify-center rounded-full border border-primary-300/70 bg-primary-200/80">
                 {node.isMain ? (
                   <AgentAvatar size="sm" />
                 ) : (
                   <PixelAvatar
                     color={getPersonaColors(node.name, node.id).body}
                     accentColor={getPersonaColors(node.name, node.id).accent}
-                    size={24}
+                    size={26}
                     status={node.status === 'queued' ? 'idle' : node.status}
                   />
                 )}
               </div>
             </div>
-            <AnimatePresence>
-              {node.status === 'complete' ? (
-                <motion.span
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute -right-1 -bottom-1 inline-flex size-4 items-center justify-center rounded-full bg-emerald-500 text-primary-50"
-                >
-                  <HugeiconsIcon
-                    icon={CheckmarkCircle01Icon}
-                    size={12}
-                    strokeWidth={1.5}
-                  />
-                </motion.span>
-              ) : null}
-            </AnimatePresence>
-          </div>
 
-          <h4 className="truncate text-center font-medium text-balance text-primary-900 text-[10px]">
-            {node.name}
-          </h4>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start gap-2">
+                <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-primary-900" title={node.name}>
+                  {node.name}
+                </h4>
+                {renderWardenMenu('size-6 shrink-0 rounded-md')}
+              </div>
+
+              <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px]">
+                <span
+                  className={cn(
+                    'inline-flex size-1.5 shrink-0 rounded-full',
+                    node.status === 'failed'
+                      ? 'bg-red-400'
+                      : node.status === 'thinking'
+                        ? 'bg-accent-400'
+                        : node.status === 'queued'
+                          ? 'bg-primary-500'
+                          : 'bg-emerald-400',
+                  )}
+                />
+                <span className={cn('truncate font-medium', getStatusTextClassName(node.status))}>
+                  {getStatusLabel(node.status)}
+                </span>
+              </div>
+
+              <p
+                className="mt-0.5 max-w-[20ch] truncate text-[10px] font-mono leading-none text-primary-600"
+                title={node.model}
+              >
+                {compactModelLabel}
+              </p>
+
+              <p className="mt-1 truncate text-[11px] text-primary-700">{node.task}</p>
+              <p className="mt-0.5 truncate text-[10px] tabular-nums text-primary-600">
+                {formatRuntime(node.runtimeSeconds)} · {node.tokenCount.toLocaleString()} tokens · ${node.cost.toFixed(2)}
+              </p>
+
+              {showActions ? (
+                <div className="mt-2 flex items-center gap-1.5">
+                  {onChat ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 min-w-0 flex-1 justify-center px-2 text-[11px]"
+                      onClick={function handleChatClick() {
+                        onChat(node.id)
+                      }}
+                    >
+                      <HugeiconsIcon icon={AiChat01Icon} size={13} strokeWidth={1.5} />
+                      Chat
+                    </Button>
+                  ) : null}
+                  {onView || useInlineDetail ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 min-w-0 flex-1 justify-center px-2 text-[11px]"
+                      onClick={handleViewClick}
+                    >
+                      <HugeiconsIcon icon={EyeIcon} size={13} strokeWidth={1.5} />
+                      View
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
         </>
       ) : (
         /* Expanded mode: horizontal layout for non-main agents */
@@ -687,7 +617,7 @@ export function AgentCard({
           {/* Right: Text content */}
           <div className="flex-1 min-w-0 pt-0.5">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <h4 className="truncate font-medium text-primary-900 text-xs">
+              <h4 className="truncate font-medium text-primary-900 text-xs" title={node.name}>
                 {node.name}
               </h4>
               <span
@@ -726,93 +656,58 @@ export function AgentCard({
         </div>
       )}
 
-      <div
-        className={cn(
-          'text-primary-700 tabular-nums',
-          isCompact
-            ? 'mt-1 rounded-lg border border-primary-300/60 bg-primary-200/30 p-1'
-            : 'mt-2 max-h-0 overflow-hidden opacity-0 transition-all duration-200 group-hover:max-h-48 group-hover:opacity-100',
-        )}
-      >
-        <p
-          className={cn(
-            'text-pretty text-primary-700',
-            isCompact ? 'line-clamp-1 text-[9px]' : 'line-clamp-2 text-[11px]',
-          )}
-        >
-          {node.task}
-        </p>
-        <p
-          className={cn(
-            'mt-0.5 truncate tabular-nums',
-            isCompact
-              ? 'text-[9px] text-primary-600'
-              : 'text-[10px] text-primary-600',
-          )}
-        >
-          {formatRuntime(node.runtimeSeconds)} ·{' '}
-          {node.tokenCount.toLocaleString()} tokens · {formatCost(node.cost)}
-        </p>
+      {!isCompact ? (
+        <div className="mt-2 max-h-0 overflow-hidden text-primary-700 tabular-nums opacity-0 transition-all duration-200 group-hover:max-h-48 group-hover:opacity-100">
+          <p className="line-clamp-2 text-pretty text-[11px] text-primary-700">{node.task}</p>
+          <p className="mt-0.5 truncate text-[10px] tabular-nums text-primary-600">
+            {formatRuntime(node.runtimeSeconds)} · {node.tokenCount.toLocaleString()} tokens · {formatCost(node.cost)}
+          </p>
 
-        {showActions ? (
-          <div
-            className={cn(
-              isCompact
-                ? 'mt-1.5 max-h-0 overflow-hidden opacity-0 transition-all duration-200 group-hover:max-h-32 group-hover:opacity-100'
-                : 'mt-2',
-            )}
-          >
-            {/* Buttons row: Chat | View | Cancel */}
-            <div className="flex items-center gap-1.5">
-              {onChat ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="flex-1 justify-center h-7 text-xs"
-                  onClick={function handleChatClick() {
-                    onChat(node.id)
-                  }}
-                >
-                  <HugeiconsIcon
-                    icon={AiChat01Icon}
-                    size={14}
-                    strokeWidth={1.5}
-                  />
-                  Chat
-                </Button>
-              ) : null}
-              {onView || useInlineDetail ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 justify-center h-7 text-xs"
-                  onClick={handleViewClick}
-                >
-                  <HugeiconsIcon icon={EyeIcon} size={14} strokeWidth={1.5} />
-                  View
-                </Button>
-              ) : null}
-              {node.status === 'queued' ? (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="flex-shrink-0 rounded-full size-7"
-                  onClick={function handleCancelClick() {
-                    onCancel?.(node.id)
-                  }}
-                  title="Cancel"
-                >
-                  <HugeiconsIcon
-                    icon={Cancel01Icon}
-                    size={14}
-                    strokeWidth={1.5}
-                  />
-                </Button>
-              ) : null}
+          {showActions ? (
+            <div className="mt-2">
+              <div className="flex items-center gap-1.5">
+                {onChat ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 flex-1 justify-center text-xs"
+                    onClick={function handleChatClick() {
+                      onChat(node.id)
+                    }}
+                  >
+                    <HugeiconsIcon icon={AiChat01Icon} size={14} strokeWidth={1.5} />
+                    Chat
+                  </Button>
+                ) : null}
+                {onView || useInlineDetail ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 flex-1 justify-center text-xs"
+                    onClick={handleViewClick}
+                  >
+                    <HugeiconsIcon icon={EyeIcon} size={14} strokeWidth={1.5} />
+                    View
+                  </Button>
+                ) : null}
+                {node.status === 'queued' ? (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="size-7 shrink-0 rounded-full"
+                    onClick={function handleCancelClick() {
+                      onCancel?.(node.id)
+                    }}
+                    title="Cancel"
+                  >
+                    <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.5} />
+                  </Button>
+                ) : null}
+              </div>
             </div>
-          </div>
-        ) : null}
-      </div>
+          ) : null}
+        </div>
+      ) : null}
       {wardenDialogs}
     </motion.article>
   )

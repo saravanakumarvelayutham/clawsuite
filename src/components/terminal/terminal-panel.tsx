@@ -12,7 +12,6 @@ import {
   ComputerTerminal01Icon,
   Search01Icon,
 } from '@hugeicons/core-free-icons'
-import { GatewayControlPanel } from './terminal-panel-control'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -280,12 +279,12 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
             )
             continue
           }
-          if (currentEvent === 'event') {
+          if (currentEvent === 'data') {
             const textChunk =
-              payload?.payload?.data ??
-              payload?.payload?.text ??
-              payload?.payload?.chunk ??
-              payload?.payload?.output
+              payload?.data ??
+              payload?.text ??
+              payload?.chunk ??
+              payload?.output
             if (typeof textChunk === 'string') {
               terminal.write(textChunk)
               const currentLog = logBufferRef.current.get(tabId) ?? ''
@@ -376,7 +375,6 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
           />
 
           <div className="flex h-full flex-col">
-            <GatewayControlPanel />
 
             <div className="flex items-center gap-2 border-b border-primary-200 px-3 py-2">
               <div className="flex items-center gap-2 overflow-x-auto">

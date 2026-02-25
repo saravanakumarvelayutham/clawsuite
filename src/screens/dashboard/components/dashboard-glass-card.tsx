@@ -50,25 +50,29 @@ export function DashboardGlassCard({
       role="region"
       aria-label={title}
       className={cn(
-        'group flex h-full flex-col overflow-hidden rounded-xl border transition-colors',
+        'group relative flex h-full flex-col overflow-hidden rounded-xl border transition-colors',
         tier === 'primary' &&
-          'border-primary-200 bg-primary-50 px-4 py-3.5 hover:border-primary-300 dark:bg-primary-50/95 md:px-5 md:py-4',
+          'border-neutral-200 bg-white px-4 py-3.5 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-900 md:px-5 md:py-4',
         tier === 'secondary' &&
-          'border-primary-200 bg-primary-50/90 px-3.5 py-3 hover:border-primary-300 dark:bg-primary-50/95 md:px-4 md:py-3',
+          'border-neutral-200 bg-white px-3.5 py-3 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-900 md:px-4 md:py-3',
         tier === 'tertiary' &&
-          'border-primary-200/80 bg-primary-50/70 px-3 py-2.5 hover:border-primary-200 dark:bg-primary-50/80 md:px-3.5 md:py-2.5',
+          'border-neutral-200 bg-white px-3 py-2.5 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-900 md:px-3.5 md:py-2.5',
         className,
       )}
     >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent-500 via-accent-400/50 to-transparent"
+      />
       <header className="mb-2 flex shrink-0 items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <HugeiconsIcon
             icon={icon}
             size={15}
             strokeWidth={1.5}
-            className="shrink-0 text-primary-400"
+            className="shrink-0 text-neutral-600 dark:text-neutral-300"
           />
-          <h2 className="truncate text-xs font-medium uppercase tracking-wide text-primary-500">
+          <h2 className="truncate text-xs font-semibold text-neutral-900 dark:text-neutral-100">
             {title}
             {titleAccessory ? (
               <span className="ml-1.5 inline-flex align-middle normal-case tracking-normal">
@@ -108,14 +112,14 @@ export function DashboardGlassCard({
                 />
               </button>
               {menuOpen ? (
-                <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-primary-200 bg-primary-50 py-1 shadow-lg dark:bg-primary-100">
+                <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-primary-200 bg-primary-50 py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
                   <button
                     type="button"
                     onClick={() => {
                       onRemove()
                       setMenuOpen(false)
                     }}
-                    className="w-full px-3 py-1.5 text-left text-xs text-primary-600 hover:bg-primary-100 dark:hover:bg-primary-200/50"
+                    className="w-full px-3 py-1.5 text-left text-xs text-primary-600 dark:text-neutral-200 hover:bg-primary-100 dark:hover:bg-primary-800"
                   >
                     Remove from dashboard
                   </button>

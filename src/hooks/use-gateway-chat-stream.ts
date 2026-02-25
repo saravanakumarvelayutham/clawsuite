@@ -15,6 +15,8 @@ type UseGatewayChatStreamOptions = {
   onThinking?: (text: string, sessionKey: string) => void
   /** Callback when a generation completes */
   onDone?: (state: string, sessionKey: string) => void
+  /** Callback when a tool approval is requested */
+  onApprovalRequest?: (approval: Record<string, unknown>) => void
 }
 
 export function useGatewayChatStream(
@@ -26,13 +28,21 @@ export function useGatewayChatStream(
     onChunk,
     onThinking,
     onDone,
+    onApprovalRequest,
   } = options
 
-  const { connectionState, setConnectionState, processEvent, lastError } =
-    useGatewayChatStore()
+  const connectionState = useGatewayChatStore((s) => s.connectionState)
+  const setConnectionState = useGatewayChatStore((s) => s.setConnectionState)
+  const processEvent = useGatewayChatStore((s) => s.processEvent)
+  const clearStreamingSession = useGatewayChatStore((s) => s.clearStreamingSession)
+  const clearAllStreaming = useGatewayChatStore((s) => s.clearAllStreaming)
+  const lastError = useGatewayChatStore((s) => s.lastError)
 
   const eventSourceRef = useRef<EventSource | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const streamTimeoutsRef = useRef<
+    Map<string, ReturnType<typeof setTimeout>>
+  >(new Map())
   const reconnectAttempts = useRef(0)
   const mountedRef = useRef(true)
 
@@ -41,10 +51,38 @@ export function useGatewayChatStream(
   const onChunkRef = useRef(onChunk)
   const onThinkingRef = useRef(onThinking)
   const onDoneRef = useRef(onDone)
+  const onApprovalRequestRef = useRef(onApprovalRequest)
   onUserMessageRef.current = onUserMessage
   onChunkRef.current = onChunk
   onThinkingRef.current = onThinking
   onDoneRef.current = onDone
+  onApprovalRequestRef.current = onApprovalRequest
+
+  const clearStreamTimeout = useCallback((sessionKey: string) => {
+    const timeoutId = streamTimeoutsRef.current.get(sessionKey)
+    if (!timeoutId) return
+    clearTimeout(timeoutId)
+    streamTimeoutsRef.current.delete(sessionKey)
+  }, [])
+
+  const touchStreamTimeout = useCallback(
+    (sessionKey: string) => {
+      clearStreamTimeout(sessionKey)
+      const timeoutId = setTimeout(() => {
+        streamTimeoutsRef.current.delete(sessionKey)
+        clearStreamingSession(sessionKey)
+      }, 30000)
+      streamTimeoutsRef.current.set(sessionKey, timeoutId)
+    },
+    [clearStreamTimeout, clearStreamingSession],
+  )
+
+  const clearAllStreamTimeouts = useCallback(() => {
+    for (const timeoutId of streamTimeoutsRef.current.values()) {
+      clearTimeout(timeoutId)
+    }
+    streamTimeoutsRef.current.clear()
+  }, [])
 
   const connect = useCallback(() => {
     if (!enabled || !mountedRef.current) return
@@ -85,6 +123,8 @@ export function useGatewayChatStream(
 
     eventSource.addEventListener('disconnected', () => {
       if (!mountedRef.current) return
+      clearAllStreamTimeouts()
+      clearAllStreaming()
       setConnectionState('disconnected')
       scheduleReconnect()
     })
@@ -93,6 +133,8 @@ export function useGatewayChatStream(
       if (!mountedRef.current) return
 
       if (eventSource.readyState === EventSource.CLOSED) {
+        clearAllStreamTimeouts()
+        clearAllStreaming()
         setConnectionState('disconnected')
         scheduleReconnect()
       }
@@ -114,6 +156,7 @@ export function useGatewayChatStream(
           sessionKey: string
         }
         processEvent({ type: 'chunk', ...data })
+        touchStreamTimeout(data.sessionKey)
         onChunkRef.current?.(data.text, data.sessionKey)
       } catch {
         // Ignore parse errors
@@ -129,6 +172,7 @@ export function useGatewayChatStream(
           sessionKey: string
         }
         processEvent({ type: 'thinking', ...data })
+        touchStreamTimeout(data.sessionKey)
         onThinkingRef.current?.(data.text, data.sessionKey)
       } catch {
         // Ignore parse errors
@@ -147,6 +191,60 @@ export function useGatewayChatStream(
           sessionKey: string
         }
         processEvent({ type: 'tool', ...data })
+        touchStreamTimeout(data.sessionKey)
+      } catch {
+        // Ignore parse errors
+      }
+    })
+
+    eventSource.addEventListener('tool_use', (event) => {
+      if (!mountedRef.current) return
+      try {
+        const data = JSON.parse(event.data) as {
+          name?: string
+          id?: string
+          toolCallId?: string
+          args?: unknown
+          arguments?: unknown
+          runId?: string
+          sessionKey: string
+        }
+        processEvent({
+          type: 'tool',
+          phase: 'calling',
+          name: data.name ?? 'tool',
+          toolCallId: data.toolCallId ?? data.id,
+          args: data.args ?? data.arguments,
+          runId: data.runId,
+          sessionKey: data.sessionKey,
+        })
+        touchStreamTimeout(data.sessionKey)
+      } catch {
+        // Ignore parse errors
+      }
+    })
+
+    eventSource.addEventListener('tool_result', (event) => {
+      if (!mountedRef.current) return
+      try {
+        const data = JSON.parse(event.data) as {
+          name?: string
+          id?: string
+          toolCallId?: string
+          runId?: string
+          sessionKey: string
+          isError?: boolean
+          error?: string
+        }
+        processEvent({
+          type: 'tool',
+          phase: data.isError || data.error ? 'error' : 'done',
+          name: data.name ?? 'tool',
+          toolCallId: data.toolCallId ?? data.id,
+          runId: data.runId,
+          sessionKey: data.sessionKey,
+        })
+        touchStreamTimeout(data.sessionKey)
       } catch {
         // Ignore parse errors
       }
@@ -191,6 +289,7 @@ export function useGatewayChatStream(
           message?: GatewayMessage
         }
         processEvent({ type: 'done', ...data })
+        clearStreamTimeout(data.sessionKey)
         onDoneRef.current?.(data.state, data.sessionKey)
       } catch {
         // Ignore parse errors
@@ -200,10 +299,24 @@ export function useGatewayChatStream(
     eventSource.addEventListener('state', () => {
       // State changes (started, thinking) - used for UI indicators
     })
+
+    eventSource.addEventListener('approval_request', (event) => {
+      if (!mountedRef.current) return
+      try {
+        const data = JSON.parse(event.data) as Record<string, unknown>
+        onApprovalRequestRef.current?.(data)
+      } catch {
+        // Ignore parse errors
+      }
+    })
   }, [
     enabled,
     setConnectionState,
     processEvent,
+    clearAllStreaming,
+    clearAllStreamTimeouts,
+    clearStreamTimeout,
+    touchStreamTimeout,
   ])
 
   const scheduleReconnect = useCallback(() => {
@@ -224,6 +337,8 @@ export function useGatewayChatStream(
   }, [enabled, connect])
 
   const disconnect = useCallback(() => {
+    clearAllStreamTimeouts()
+
     if (eventSourceRef.current) {
       eventSourceRef.current.close()
       eventSourceRef.current = null
@@ -234,8 +349,9 @@ export function useGatewayChatStream(
       reconnectTimeoutRef.current = null
     }
 
+    clearAllStreaming()
     setConnectionState('disconnected')
-  }, [setConnectionState])
+  }, [clearAllStreaming, clearAllStreamTimeouts, setConnectionState])
 
   const reconnect = useCallback(() => {
     disconnect()

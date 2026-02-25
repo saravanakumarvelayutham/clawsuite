@@ -4,6 +4,7 @@ import {
   BotIcon,
   BrainIcon,
   ChartLineData01Icon,
+  ChartLineData02Icon,
   Chat01Icon,
   Clock01Icon,
   ComputerTerminal01Icon,
@@ -61,30 +62,26 @@ import {
   MenuItem,
 } from '@/components/ui/menu'
 import { Sun02Icon, Moon02Icon } from '@hugeicons/core-free-icons'
+import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
 
 function ThemeToggleMini() {
-  const [mounted, setMounted] = useState(false)
-  const [isDark, setIsDark] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  useEffect(() => {
-    if (!mounted) return
-    setIsDark(document.documentElement.classList.contains('dark'))
-  }, [mounted])
+  const theme = useSettingsStore((state) => state.settings.theme)
+  const updateSettings = useSettingsStore((state) => state.updateSettings)
+  const isDark =
+    theme === 'dark' ||
+    (theme === 'system' &&
+      typeof document !== 'undefined' &&
+      document.documentElement.classList.contains('dark'))
 
   return (
     <button
       type="button"
       onClick={() => {
-        const next = !isDark
-        setIsDark(next)
-        document.documentElement.classList.toggle('dark', next)
-        localStorage.setItem('theme', next ? 'dark' : 'light')
+        const nextTheme = isDark ? 'light' : 'dark'
+        applyTheme(nextTheme)
+        updateSettings({ theme: nextTheme })
       }}
-      className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200/70 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-gray-300 transition-colors"
+      className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={16} strokeWidth={1.5} />
@@ -180,8 +177,8 @@ function NavItem({
     'w-full h-auto min-h-11 gap-2.5 py-2 md:min-h-0',
     isCollapsed ? 'justify-center px-0' : 'justify-start px-3',
     item.active
-      ? 'bg-accent-500/10 text-accent-500 hover:bg-accent-500/15'
-      : 'text-primary-900 hover:bg-primary-200',
+      ? 'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15'
+      : 'text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
   )
 
   const iconEl =
@@ -352,7 +349,7 @@ function SectionLabel({
   if (isCollapsed) return null
 
   const labelContent = (
-    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-gray-400 select-none">
+    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 select-none">
       {label}
     </span>
   )
@@ -367,7 +364,7 @@ function SectionLabel({
         {navigateTo ? (
           <Link
             to={navigateTo}
-            className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-gray-400 hover:text-primary-700 dark:hover:text-gray-200 select-none transition-colors"
+            className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200 select-none transition-colors"
           >
             {label}
           </Link>
@@ -377,7 +374,7 @@ function SectionLabel({
         <button
           type="button"
           onClick={onToggle}
-          className="ml-auto p-0.5 rounded hover:bg-primary-200 transition-colors"
+          className="ml-auto p-0.5 rounded hover:bg-primary-200 dark:hover:bg-primary-800 transition-colors"
           aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
         >
           <HugeiconsIcon
@@ -403,7 +400,7 @@ function SectionLabel({
       {navigateTo ? (
         <Link
           to={navigateTo}
-          className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-gray-400 hover:text-primary-700 dark:hover:text-gray-200 select-none transition-colors"
+          className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-neutral-400 hover:text-primary-700 dark:hover:text-neutral-200 select-none transition-colors"
         >
           {label}
         </Link>
@@ -545,6 +542,7 @@ function ChatSidebarComponent({
   const isChannelsActive = pathname === '/channels'
   const isSessionsActive = pathname === '/sessions'
   const isUsageActive = pathname === '/usage'
+  const isCostsActive = pathname === '/costs'
   const isInstancesActive = pathname === '/instances'
   // Agent
   const isAgentsActive = pathname === '/agents'
@@ -576,6 +574,7 @@ function ChatSidebarComponent({
     '/instances',
     '/sessions',
     '/usage',
+    '/costs',
     '/agents',
     '/nodes',
   ]
@@ -627,6 +626,7 @@ function ChatSidebarComponent({
   const [deleteSessionTitle, setDeleteSessionTitle] = useState('')
   const [providersOpen, setProvidersOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [isHoverExpanded, setIsHoverExpanded] = useState(false)
   const sidebarRef = useRef<HTMLElement | null>(null)
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null)
 
@@ -681,9 +681,17 @@ function ChatSidebarComponent({
     return () => media.removeEventListener('change', update)
   }, [])
 
+  useEffect(() => {
+    if (isMobile || !isCollapsed) {
+      setIsHoverExpanded(false)
+    }
+  }, [isCollapsed, isMobile])
+
+  const isVisuallyCollapsed = isCollapsed && !isHoverExpanded
+
   const asideProps = {
     className: cn(
-      'border-r border-primary-200 h-full overflow-hidden bg-primary-50 dark:bg-primary-100 flex flex-col',
+      'border-r h-full overflow-hidden flex flex-col theme-sidebar theme-border',
       isMobile && 'fixed inset-y-0 left-0 z-50 shadow-2xl',
       isMobile && isCollapsed && 'pointer-events-none',
     ),
@@ -868,6 +876,13 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
+      to: '/costs',
+      icon: ChartLineData02Icon,
+      label: 'Costs',
+      active: isCostsActive,
+    },
+    {
+      kind: 'link',
       to: '/agents',
       icon: UserGroupIcon,
       label: 'Agents',
@@ -882,7 +897,7 @@ function ChatSidebarComponent({
     },
   ]
 
-  // Auto-expand sections if any child route is active
+  // Auto-expand mobile System section if any child route is active.
   const mobileSystemLabels = [
     'Files',
     'Memory',
@@ -896,9 +911,7 @@ function ChatSidebarComponent({
   const mobileSecondarySuite = mobileSystemLabels
     .map((label) => suiteItems.find((item) => item.label === label))
     .filter((item): item is NavItemDef => Boolean(item))
-  const isAnySuiteActive = suiteItems.some((i) => i.active)
   const isAnySystemActive = mobileSecondarySuite.some((item) => item.active)
-  const isAnyGatewayActive = gatewayItems.some((i) => i.active)
 
   return (
     <motion.aside
@@ -907,12 +920,18 @@ function ChatSidebarComponent({
       }}
       initial={false}
       animate={{
-        width: isCollapsed ? (isMobile ? 0 : 48) : isMobile ? '85vw' : 300,
+        width: isVisuallyCollapsed ? (isMobile ? 0 : 48) : isMobile ? '85vw' : 300,
       }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       className={cn(asideProps.className, isMobile && isCollapsed && 'pointer-events-none overflow-hidden')}
       data-tour="sidebar-container"
       style={isMobile ? { maxWidth: 360 } : undefined}
+      onMouseEnter={() => {
+        if (!isMobile && isCollapsed) setIsHoverExpanded(true)
+      }}
+      onMouseLeave={() => {
+        if (!isMobile) setIsHoverExpanded(false)
+      }}
       aria-hidden={isMobile && isCollapsed ? true : undefined}
       {...(isMobile && isCollapsed ? { inert: '' as unknown as boolean } : {})}
     >
@@ -922,11 +941,11 @@ function ChatSidebarComponent({
         transition={{ layout: transition }}
         className={cn(
           'flex items-center h-12 px-2',
-          isCollapsed ? 'justify-center' : 'justify-between',
+          isVisuallyCollapsed ? 'justify-center' : 'justify-between',
         )}
       >
         <AnimatePresence initial={false}>
-          {!isCollapsed ? (
+          {!isVisuallyCollapsed ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -955,6 +974,8 @@ function ChatSidebarComponent({
                   size="icon-sm"
                   variant="ghost"
                   aria-label={isCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+                  className="shrink-0"
+                  data-tour="sidebar-collapse-toggle"
                 >
                   {isCollapsed ? (
                     <OpenClawStudioIcon className="size-5 rounded-sm" />
@@ -984,7 +1005,7 @@ function ChatSidebarComponent({
         >
           <NavItem
             item={searchItem}
-            isCollapsed={isCollapsed}
+            isCollapsed={isVisuallyCollapsed}
             transition={transition}
             onSelectSession={onSelectSession}
           />
@@ -992,7 +1013,7 @@ function ChatSidebarComponent({
       </div>
 
       {/* ── New Session button ──────────────────────────────────────── */}
-      {!isCollapsed && (
+      {!isVisuallyCollapsed && (
         <div className="px-2 pb-1">
           <Link
             to="/chat/$sessionKey"
@@ -1002,9 +1023,9 @@ function ChatSidebarComponent({
             }}
             className={cn(
               buttonVariants({ variant: 'ghost', size: 'sm' }),
-              'w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200',
+              'w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200 dark:hover:bg-primary-800',
               isNewSessionActive &&
-                'bg-accent-500/10 text-accent-500 hover:bg-accent-500/15',
+                'bg-accent-500/10 text-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/300/15',
             )}
             data-tour="new-session"
           >
@@ -1028,17 +1049,17 @@ function ChatSidebarComponent({
               {/* SUITE */}
               <SectionLabel
                 label="Suite"
-                isCollapsed={isCollapsed}
+                isCollapsed={isVisuallyCollapsed}
                 transition={transition}
                 collapsible
-                expanded={suiteExpanded || isAnySuiteActive}
+                expanded={suiteExpanded}
                 onToggle={toggleSuite}
                 navigateTo={suiteNav}
               />
               <CollapsibleSection
-                expanded={suiteExpanded || isAnySuiteActive || isCollapsed}
+                expanded={suiteExpanded || isCollapsed}
                 items={suiteItems}
-                isCollapsed={isCollapsed}
+                isCollapsed={isVisuallyCollapsed}
                 transition={transition}
                 onSelectSession={onSelectSession}
               />
@@ -1049,7 +1070,7 @@ function ChatSidebarComponent({
             <>
               <SectionLabel
                 label="System"
-                isCollapsed={isCollapsed}
+                isCollapsed={isVisuallyCollapsed}
                 transition={transition}
                 collapsible
                 expanded={systemExpanded || isAnySystemActive}
@@ -1058,7 +1079,7 @@ function ChatSidebarComponent({
               <CollapsibleSection
                 expanded={systemExpanded || isAnySystemActive || isCollapsed}
                 items={mobileSecondarySuite}
-                isCollapsed={isCollapsed}
+                isCollapsed={isVisuallyCollapsed}
                 transition={transition}
                 onSelectSession={onSelectSession}
               />
@@ -1068,17 +1089,17 @@ function ChatSidebarComponent({
           {/* GATEWAY */}
           <SectionLabel
             label="Gateway"
-            isCollapsed={isCollapsed}
+            isCollapsed={isVisuallyCollapsed}
             transition={transition}
             collapsible
-            expanded={gatewayExpanded || isAnyGatewayActive}
+            expanded={gatewayExpanded}
             onToggle={toggleGateway}
             navigateTo={gatewayNav}
           />
           <CollapsibleSection
-            expanded={gatewayExpanded || isAnyGatewayActive || isCollapsed}
+            expanded={gatewayExpanded || isCollapsed}
             items={gatewayItems}
-            isCollapsed={isCollapsed}
+            isCollapsed={isVisuallyCollapsed}
             transition={transition}
             onSelectSession={onSelectSession}
           />
@@ -1092,7 +1113,7 @@ function ChatSidebarComponent({
           )}
         >
           <AnimatePresence initial={false}>
-            {!isCollapsed && (
+            {!isVisuallyCollapsed && (
               <motion.div
                 key="content"
                 initial={{ opacity: 0 }}
@@ -1122,19 +1143,19 @@ function ChatSidebarComponent({
       {/* end scrollable body */}
 
       {/* ── Footer with User Menu ─────────────────────────────────── */}
-      <div className="px-2 py-2.5 border-t border-primary-200 bg-primary-100/80 dark:bg-gray-900 shrink-0">
+      <div className="px-2 py-2.5 border-t shrink-0 theme-border theme-panel">
         {/* User card + actions */}
         <div className={cn(
           'flex items-center rounded-lg transition-colors',
-          isCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
+          isVisuallyCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
         )}>
           {/* User menu trigger */}
           <MenuRoot>
             <MenuTrigger
               data-tour="settings"
               className={cn(
-                'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-primary-200/70 dark:hover:bg-gray-800 flex-1 min-w-0',
-                isCollapsed ? 'justify-center px-0' : 'px-1.5',
+                'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-primary-200 dark:hover:bg-neutral-800 flex-1 min-w-0',
+                isVisuallyCollapsed ? 'justify-center px-0' : 'px-1.5',
               )}
             >
               <UserAvatar
@@ -1143,7 +1164,7 @@ function ChatSidebarComponent({
                 alt={profileDisplayName}
               />
               <AnimatePresence initial={false} mode="wait">
-                {!isCollapsed && (
+                {!isVisuallyCollapsed && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -1151,7 +1172,7 @@ function ChatSidebarComponent({
                     transition={transition}
                     className="flex-1 min-w-0 flex items-center gap-1.5"
                   >
-                    <span className="block truncate text-sm font-medium text-primary-900 dark:text-gray-100">
+                    <span className="block truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
                       {profileDisplayName}
                     </span>
                     <GatewayStatusDot />
@@ -1174,7 +1195,7 @@ function ChatSidebarComponent({
                   />
                   Settings
                 </span>
-                <kbd className="ml-auto text-[10px] text-primary-500 dark:text-gray-400 font-mono">
+                <kbd className="ml-auto text-[10px] text-primary-500 dark:text-neutral-400 font-mono">
                   {mod},
                 </kbd>
               </MenuItem>
@@ -1188,7 +1209,7 @@ function ChatSidebarComponent({
                   <HugeiconsIcon icon={ApiIcon} size={20} strokeWidth={1.5} />
                   Providers
                 </span>
-                <kbd className="ml-auto text-[10px] text-primary-500 dark:text-gray-400 font-mono">
+                <kbd className="ml-auto text-[10px] text-primary-500 dark:text-neutral-400 font-mono">
                   {mod}P
                 </kbd>
               </MenuItem>
@@ -1196,12 +1217,12 @@ function ChatSidebarComponent({
           </MenuRoot>
 
           {/* Settings + Theme toggle */}
-          {!isCollapsed && (
+          {!isVisuallyCollapsed && (
             <div className="flex items-center gap-0.5">
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
-                className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200/70 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-gray-300 transition-colors"
+                className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200 dark:hover:bg-neutral-800 hover:text-primary-600 dark:hover:text-neutral-300 transition-colors"
                 aria-label="Settings"
               >
                 <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.5} />

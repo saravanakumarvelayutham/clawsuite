@@ -1,85 +1,60 @@
 import {
-  Activity01Icon,
   ArrowDown01Icon,
   ArrowUp02Icon,
+  Activity01Icon,
+  BubbleChatIcon,
   ChartLineData02Icon,
   Moon02Icon,
   PencilEdit02Icon,
   RefreshIcon,
   Settings01Icon,
   Sun02Icon,
-  Timer02Icon,
   UserGroupIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import {
-  type MouseEvent,
   type ReactNode,
+  type RefObject,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
-import { AgentStatusWidget } from './components/agent-status-widget'
+import { SquadStatusWidget } from './components/squad-status-widget'
 import { ActivityLogWidget } from './components/activity-log-widget'
 import { CollapsibleWidget } from './components/collapsible-widget'
 import { MetricsWidget } from './components/metrics-widget'
-import { NowCard } from './components/now-card'
 import { NotificationsWidget } from './components/notifications-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
-import { SkillsWidget, fetchInstalledSkills } from './components/skills-widget'
-// SystemInfoWidget removed — not useful enough for dashboard real estate
+import { ServicesHealthWidget } from './components/services-health-widget'
+import { ScheduledJobsWidget } from './components/scheduled-jobs-widget'
+import { SkillsWidget } from './components/skills-widget'
 import { TasksWidget } from './components/tasks-widget'
-import { UsageMeterWidget, fetchUsage } from './components/usage-meter-widget'
+import { UsageMeterWidget } from './components/usage-meter-widget'
+import { SystemGlance } from './components/system-glance'
 import { AddWidgetPopover } from './components/add-widget-popover'
-import { WidgetGrid, type WidgetGridItem } from './components/widget-grid'
-import { ActivityTicker } from '@/components/activity-ticker'
+// QuickActionsRow replaced by inline widget cards on mobile (MOB-5)
+import { TokenUsageHero } from './components/token-usage-hero'
+import { type WidgetGridItem } from './components/widget-grid'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import { NotificationsPopover } from './components/notifications-popover'
 import { useVisibleWidgets } from './hooks/use-visible-widgets'
+import { useDashboardData, buildUsageSummaryText } from './hooks/use-dashboard-data'
+import { formatMoney, formatRelativeTime } from './lib/formatters'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { OpenClawStudioIcon } from '@/components/icons/clawsuite'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { SettingsDialog } from '@/components/settings-dialog'
 import { DashboardOverflowPanel } from '@/components/dashboard-overflow-panel'
-import {
-  chatQueryKeys,
-  fetchGatewayStatus,
-  fetchSessions,
-} from '@/screens/chat/chat-queries'
-import { fetchCronJobs } from '@/lib/cron-api'
+import { SystemMetricsFooter } from '@/components/system-metrics-footer'
 import { cn } from '@/lib/utils'
-import { toast } from '@/components/ui/toast'
 import { useSettingsStore } from '@/hooks/use-settings'
 import {
   type DashboardWidgetOrderId,
   useWidgetReorder,
 } from '@/hooks/use-widget-reorder'
-
-type SessionStatusPayload = {
-  ok?: boolean
-  payload?: {
-    model?: string
-    currentModel?: string
-    modelAlias?: string
-    sessions?: {
-      defaults?: { model?: string; contextTokens?: number }
-      count?: number
-      recent?: Array<{ age?: number; model?: string; percentUsed?: number }>
-    }
-  }
-}
-
-type DashboardCostSummaryPayload = {
-  ok?: boolean
-  cost?: {
-    timeseries?: Array<{
-      date?: string
-      amount?: number | string
-    }>
-  }
-}
 
 type MobileWidgetSection = {
   id: DashboardWidgetOrderId
@@ -87,192 +62,86 @@ type MobileWidgetSection = {
   content: ReactNode
 }
 
-type DashboardSignalChip = {
-  id: string
-  text: string
-  severity: 'amber' | 'red'
-}
+// ─── Pull-to-refresh hook ────────────────────────────────────────────────────
 
-// Pull-to-refresh constants removed
+function usePullToRefresh(
+  enabled: boolean,
+  onRefresh: () => void,
+  containerRef: RefObject<HTMLElement | null>,
+) {
+  const [isPulling, setIsPulling] = useState(false)
+  const [pullDistance, setPullDistance] = useState(0)
+  const startYRef = useRef(0)
+  const isPullingRef = useRef(false)
+  const THRESHOLD = 72
 
-function readNumeric(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string') {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return 0
-}
+  useEffect(() => {
+    if (!enabled) return
+    const container = containerRef.current
+    if (!container) return
 
-function toLocalDateKey(date: Date): string {
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount)
-}
-
-function formatTokenCount(amount: number): string {
-  return new Intl.NumberFormat().format(Math.max(0, Math.round(amount)))
-}
-
-function formatUptime(seconds: number): string {
-  if (seconds <= 0) return '—'
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  if (days > 0) return `${days}d ${hours}h`
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
-}
-
-function normalizeTimestamp(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value > 1_000_000_000_000 ? value : value * 1000
-  }
-  if (typeof value === 'string') {
-    const parsed = Date.parse(value)
-    if (!Number.isNaN(parsed)) return parsed
-    const asNumber = Number(value)
-    if (Number.isFinite(asNumber)) {
-      return asNumber > 1_000_000_000_000 ? asNumber : asNumber * 1000
-    }
-  }
-  return 0
-}
-
-function toSessionDisplayName(session: Record<string, unknown>): string {
-  const label =
-    typeof session.label === 'string' && session.label.trim().length > 0
-      ? session.label.trim()
-      : ''
-  if (label) return label
-
-  const derived =
-    typeof session.derivedTitle === 'string' &&
-    session.derivedTitle.trim().length > 0
-      ? session.derivedTitle.trim()
-      : ''
-  if (derived) return derived
-
-  const title =
-    typeof session.title === 'string' && session.title.trim().length > 0
-      ? session.title.trim()
-      : ''
-  if (title) return title
-
-  const friendlyId =
-    typeof session.friendlyId === 'string' && session.friendlyId.trim().length > 0
-      ? session.friendlyId.trim()
-      : 'main'
-  return friendlyId === 'main' ? 'Main Session' : friendlyId
-}
-
-function toTaskSummaryStatus(
-  job: Awaited<ReturnType<typeof fetchCronJobs>>[number],
-): 'backlog' | 'in_progress' | 'review' | 'done' {
-  if (!job.enabled) return 'backlog'
-  const status = job.lastRun?.status
-  if (status === 'running' || status === 'queued') return 'in_progress'
-  if (status === 'error') return 'review'
-  if (status === 'success') return 'done'
-  return 'backlog'
-}
-
-async function fetchCostTimeseries(): Promise<
-  Array<{ date: string; amount: number }>
-> {
-  const response = await fetch('/api/cost')
-  if (!response.ok) throw new Error('Unable to load cost summary')
-  const payload = (await response.json()) as DashboardCostSummaryPayload
-  if (!payload.ok || !payload.cost) throw new Error('Unable to load cost summary')
-
-  const rows = Array.isArray(payload.cost.timeseries) ? payload.cost.timeseries : []
-  return rows
-    .map(function mapCostPoint(point) {
-      return {
-        date: typeof point.date === 'string' ? point.date : '',
-        amount: readNumeric(point.amount),
+    function onTouchStart(e: TouchEvent) {
+      if (container!.scrollTop === 0 && e.touches[0]) {
+        startYRef.current = e.touches[0].clientY
+        isPullingRef.current = true
       }
-    })
-    .filter(function hasDate(point) {
-      return point.date.length > 0
-    })
-}
-
-async function fetchSessionStatus(): Promise<SessionStatusPayload> {
-  try {
-    const response = await fetch('/api/session-status')
-    if (!response.ok) {
-      toast('Failed to fetch session status', { type: 'error' })
-      return {}
     }
-    return response.json() as Promise<SessionStatusPayload>
-  } catch (err) {
-    toast('Failed to fetch session status', { type: 'error' })
-    return {}
-  }
-}
 
-async function fetchHeroCost(): Promise<string> {
-  try {
-    const response = await fetch('/api/cost')
-    if (!response.ok) {
-      toast('Failed to fetch cost data', { type: 'error' })
-      return '—'
+    function onTouchMove(e: TouchEvent) {
+      if (!isPullingRef.current || !e.touches[0]) return
+      const delta = e.touches[0].clientY - startYRef.current
+      if (delta > 0) {
+        setPullDistance(Math.min(delta, THRESHOLD * 1.5))
+        setIsPulling(delta > 10)
+      }
     }
-    const data = (await response.json()) as Record<string, unknown>
-    const cost = data.cost as Record<string, unknown> | undefined
-    const total = cost?.total as Record<string, unknown> | undefined
-    const amount = total?.amount
-    if (typeof amount === 'number') return `$${amount.toFixed(2)}`
-    if (typeof amount === 'string') return `$${amount}`
-    return '—'
-  } catch {
-    toast('Failed to fetch cost data', { type: 'error' })
-    return '—'
-  }
+
+    function onTouchEnd() {
+      if (!isPullingRef.current) return
+      const delta = pullDistance
+      isPullingRef.current = false
+      if (delta >= THRESHOLD) {
+        onRefresh()
+      }
+      setIsPulling(false)
+      setPullDistance(0)
+    }
+
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchmove', onTouchMove, { passive: true })
+    container.addEventListener('touchend', onTouchEnd)
+
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchmove', onTouchMove)
+      container.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [enabled, onRefresh, containerRef, pullDistance])
+
+  return { isPulling, pullDistance, threshold: THRESHOLD }
 }
 
-function formatModelName(raw: string): string {
-  if (!raw) return '—'
-  // claude-opus-4-6 → Opus 4.6, claude-sonnet-4-5 → Sonnet 4.5, gpt-5.2-codex → GPT-5.2 Codex
-  const lower = raw.toLowerCase()
-  if (lower.includes('opus')) {
-    const match = raw.match(/opus[- ]?(\d+)[- ]?(\d+)/i)
-    return match ? `Opus ${match[1]}.${match[2]}` : 'Opus'
-  }
-  if (lower.includes('sonnet')) {
-    const match = raw.match(/sonnet[- ]?(\d+)[- ]?(\d+)/i)
-    return match ? `Sonnet ${match[1]}.${match[2]}` : 'Sonnet'
-  }
-  if (lower.includes('gpt')) return raw.replace('gpt-', 'GPT-')
-  if (lower.includes('gemini')) return raw.split('/').pop() ?? raw
-  return raw
-}
-
-// Removed mockSystemStatus - now built entirely from real API data
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export function DashboardScreen() {
   const navigate = useNavigate()
   const [dashSettingsOpen, setDashSettingsOpen] = useState(false)
   const [overflowOpen, setOverflowOpen] = useState(false)
+  const [dismissedChips, setDismissedChips] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const stored = window.localStorage.getItem('clawsuite-dismissed-chips')
+      return stored ? new Set(JSON.parse(stored) as string[]) : new Set()
+    } catch { return new Set() }
+  })
   const { visibleIds, addWidget, removeWidget, resetVisible } =
     useVisibleWidgets()
   const { order: widgetOrder, moveWidget, resetOrder } = useWidgetReorder()
   const theme = useSettingsStore((state) => state.settings.theme)
+  const showSystemMetricsFooter = useSettingsStore((state) => state.settings.showSystemMetricsFooter)
   const updateSettings = useSettingsStore((state) => state.updateSettings)
   const [isMobile, setIsMobile] = useState(false)
   const [mobileEditMode, setMobileEditMode] = useState(false)
-  const [nowMs, setNowMs] = useState(() => Date.now())
   const [showLogoTip, setShowLogoTip] = useState(() => {
     if (typeof window === 'undefined') return false
     try {
@@ -281,19 +150,25 @@ export function DashboardScreen() {
       return false
     }
   })
-  // Pull-to-refresh removed (was buggy on mobile)
+  const mainScrollRef = useRef<HTMLElement>(null)
 
+  // ── Dashboard data (single hook, all queries + computed values) ────────────
+  const { data: dashboardData, refetch } = useDashboardData()
+
+  // ── Pull-to-refresh (mobile) ───────────────────────────────────────────────
+  const { isPulling, pullDistance, threshold } = usePullToRefresh(
+    isMobile,
+    refetch,
+    mainScrollRef,
+  )
+
+  // B5: Use md-breakpoint-consistent 767px (= Tailwind md − 1px)
   useEffect(() => {
     const media = window.matchMedia('(max-width: 767px)')
     const update = () => setIsMobile(media.matches)
     update()
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
-  }, [])
-
-  useEffect(() => {
-    const interval = window.setInterval(() => setNowMs(Date.now()), 60_000)
-    return () => window.clearInterval(interval)
   }, [])
 
   useEffect(() => {
@@ -312,251 +187,6 @@ export function DashboardScreen() {
     resetOrder()
     setMobileEditMode(false)
   }, [resetOrder, resetVisible])
-
-  const sessionsQuery = useQuery({
-    queryKey: chatQueryKeys.sessions,
-    queryFn: fetchSessions,
-    refetchInterval: 30_000,
-  })
-
-  const gatewayStatusQuery = useQuery({
-    queryKey: ['gateway', 'dashboard-status'],
-    queryFn: fetchGatewayStatus,
-    retry: false,
-    refetchInterval: 15_000,
-  })
-
-  const sessionStatusQuery = useQuery({
-    queryKey: ['gateway', 'session-status'],
-    queryFn: fetchSessionStatus,
-    retry: false,
-    refetchInterval: 30_000,
-  })
-
-  const heroCostQuery = useQuery({
-    queryKey: ['dashboard', 'hero-cost'],
-    queryFn: fetchHeroCost,
-    staleTime: 60_000,
-    refetchInterval: 60_000,
-  })
-
-  const cronJobsQuery = useQuery({
-    queryKey: ['cron', 'jobs'],
-    queryFn: fetchCronJobs,
-    retry: false,
-    refetchInterval: 30_000,
-  })
-
-  const skillsSummaryQuery = useQuery({
-    queryKey: ['dashboard', 'skills'],
-    queryFn: fetchInstalledSkills,
-    staleTime: 60_000,
-    refetchInterval: 60_000,
-  })
-
-  const usageSummaryQuery = useQuery({
-    queryKey: ['dashboard', 'usage'],
-    queryFn: fetchUsage,
-    retry: false,
-    refetchInterval: 30_000,
-  })
-
-  const costTimeseriesQuery = useQuery({
-    queryKey: ['dashboard', 'cost-timeseries'],
-    queryFn: fetchCostTimeseries,
-    retry: false,
-    staleTime: 60_000,
-    refetchInterval: 60_000,
-  })
-
-  const systemStatus = useMemo(
-    function buildSystemStatus() {
-      const nowIso = new Date().toISOString()
-      const sessions = Array.isArray(sessionsQuery.data)
-        ? sessionsQuery.data
-        : []
-      const ssPayload = sessionStatusQuery.data?.payload?.sessions
-
-      // Get active model from main session, fall back to gateway default
-      const mainSessionModel = ssPayload?.recent?.[0]?.model ?? ''
-      const payloadModel = sessionStatusQuery.data?.payload?.model ?? ''
-      const payloadCurrentModel =
-        sessionStatusQuery.data?.payload?.currentModel ?? ''
-      const payloadAlias = sessionStatusQuery.data?.payload?.modelAlias ?? ''
-      const rawModel =
-        mainSessionModel ||
-        payloadModel ||
-        payloadCurrentModel ||
-        payloadAlias ||
-        ssPayload?.defaults?.model ||
-        ''
-      const currentModel = formatModelName(rawModel)
-
-      // Derive uptime from main session age (milliseconds → seconds)
-      const mainSession = ssPayload?.recent?.[0]
-      const uptimeSeconds = mainSession?.age
-        ? Math.floor(mainSession.age / 1000)
-        : 0
-
-      const totalSessions = ssPayload?.count ?? sessions.length
-      const activeAgents = ssPayload?.recent?.length ?? sessions.length
-
-      return {
-        gateway: {
-          connected: gatewayStatusQuery.data?.ok ?? !gatewayStatusQuery.isError,
-          checkedAtIso: nowIso,
-        },
-        uptimeSeconds,
-        currentModel,
-        totalSessions,
-        activeAgents,
-      }
-    },
-    [gatewayStatusQuery.data?.ok, sessionsQuery.data, sessionStatusQuery.data],
-  )
-
-  const taskSummary = useMemo(
-    function buildTaskSummary() {
-      const jobs = Array.isArray(cronJobsQuery.data) ? cronJobsQuery.data : []
-      const counts = {
-        backlog: 0,
-        inProgress: 0,
-        done: 0,
-      }
-
-      for (const job of jobs) {
-        const status = toTaskSummaryStatus(job)
-        if (status === 'backlog') counts.backlog += 1
-        if (status === 'in_progress') counts.inProgress += 1
-        if (status === 'done') counts.done += 1
-      }
-
-      return counts
-    },
-    [cronJobsQuery.data],
-  )
-
-  const enabledSkillsCount = useMemo(
-    function countEnabledSkills() {
-      const skills = Array.isArray(skillsSummaryQuery.data)
-        ? skillsSummaryQuery.data
-        : []
-      return skills.filter((skill) => skill.enabled).length
-    },
-    [skillsSummaryQuery.data],
-  )
-
-  const usageSummary = useMemo(
-    function buildUsageSummary() {
-      const usage = usageSummaryQuery.data
-      if (usageSummaryQuery.isError || usage?.kind === 'error' || usage?.kind === 'unavailable') {
-        return {
-          state: 'error' as const,
-          text: 'Usage unavailable',
-          tokensToday: 0,
-          todayCost: 0,
-        }
-      }
-
-      if (!usage || usage.kind !== 'ok') {
-        return {
-          state: 'loading' as const,
-          text: 'Usage: loading…',
-          tokensToday: 0,
-          todayCost: 0,
-        }
-      }
-
-      const tokensToday = usage.data.totalUsage
-      const todayDateKey = toLocalDateKey(new Date(nowMs))
-      const timeseries = Array.isArray(costTimeseriesQuery.data)
-        ? costTimeseriesQuery.data
-        : []
-      const todayPoint =
-        timeseries.find((point) => point.date.startsWith(todayDateKey)) ??
-        timeseries[timeseries.length - 1]
-      const todayCost = todayPoint ? Math.max(0, todayPoint.amount) : 0
-
-      return {
-        state: 'ok' as const,
-        text: `Usage: ${formatCurrency(todayCost)} today • ${formatTokenCount(tokensToday)} tokens`,
-        tokensToday,
-        todayCost,
-      }
-    },
-    [costTimeseriesQuery.data, nowMs, usageSummaryQuery.data, usageSummaryQuery.isError],
-  )
-
-  const stalledAgentName = useMemo(
-    function findStalledAgentName() {
-      const sessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []
-      if (sessions.length === 0) return null
-
-      const now = Date.now()
-      const stalled = sessions
-        .map(function mapSession(session) {
-          const raw = session as Record<string, unknown>
-          const updatedAt = normalizeTimestamp(raw.updatedAt)
-          if (updatedAt <= 0) return null
-
-          const staleForMs = now - updatedAt
-          if (staleForMs <= 30 * 60 * 1000) return null
-
-          return {
-            name: toSessionDisplayName(raw),
-            staleForMs,
-          }
-        })
-        .filter((entry): entry is { name: string; staleForMs: number } => entry !== null)
-        .sort((left, right) => right.staleForMs - left.staleForMs)
-
-      return stalled[0]?.name ?? null
-    },
-    [sessionsQuery.data],
-  )
-
-  const contextUsagePercent = useMemo(
-    function readContextUsagePercent() {
-      const usage = usageSummaryQuery.data
-      if (!usage || usage.kind !== 'ok') return 0
-      const percent = Math.round(usage.data.usagePercent ?? 0)
-      return Math.max(0, percent)
-    },
-    [usageSummaryQuery.data],
-  )
-
-  const dashboardSignalChips = useMemo<Array<DashboardSignalChip>>(
-    function buildDashboardSignalChips() {
-      const chips: Array<DashboardSignalChip> = []
-
-      if (usageSummary.state === 'ok' && usageSummary.todayCost > 50) {
-        chips.push({
-          id: 'high-spend',
-          text: `⚠ High spend today: ${formatCurrency(usageSummary.todayCost)}`,
-          severity: 'amber',
-        })
-      }
-
-      if (stalledAgentName) {
-        chips.push({
-          id: 'stalled-agent',
-          text: `⚠ Agent stalled: ${stalledAgentName}`,
-          severity: 'red',
-        })
-      }
-
-      if (contextUsagePercent >= 75) {
-        chips.push({
-          id: 'context-pressure',
-          text: `Memory pressure: ${contextUsagePercent}%`,
-          severity: 'amber',
-        })
-      }
-
-      return chips
-    },
-    [contextUsagePercent, stalledAgentName, usageSummary.state, usageSummary.todayCost],
-  )
 
   const nextTheme = useMemo(
     () => (theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'),
@@ -582,48 +212,48 @@ export function DashboardScreen() {
     setOverflowOpen(true)
   }, [markLogoTipSeen])
 
-  const retryUsageSummary = useCallback(
-    function retryUsageSummary(event?: MouseEvent<HTMLButtonElement>) {
-      event?.stopPropagation()
-      void Promise.allSettled([usageSummaryQuery.refetch(), costTimeseriesQuery.refetch()])
-    },
-    [costTimeseriesQuery, usageSummaryQuery],
-  )
-
   const visibleWidgetSet = useMemo(() => {
     return new Set(visibleIds)
   }, [visibleIds])
 
-  const retryHeroCost = useCallback(() => {
-    void heroCostQuery.refetch()
-  }, [heroCostQuery])
+  // ── Derived display values ─────────────────────────────────────────────────
 
-  const costTrendPct = useMemo(() => {
-    const points = Array.isArray(costTimeseriesQuery.data)
-      ? [...costTimeseriesQuery.data]
-      : []
-    if (points.length < 2) return undefined
+  // Canonical cost display — single source of truth for both SystemGlance and MetricCards.
+  // todayCostUsd is the priority-resolved value; cost.today mirrors it once the hook settles.
+  // Never shows "—"; always shows at least $0.00.
+  const costTodayDisplay = formatMoney(dashboardData.todayCostUsd ?? dashboardData.cost.today)
 
-    points.sort((left, right) => left.date.localeCompare(right.date))
-    const latest = points[points.length - 1]
-    const previous = points[points.length - 2]
-    if (!latest || !previous) return undefined
-    if (previous.amount <= 0) return undefined
-    return ((latest.amount - previous.amount) / previous.amount) * 100
-  }, [costTimeseriesQuery.data])
+  // B1: Uptime fallback — if formatted is "—", show "Active · last check Xm ago"
+  const uptimeDisplay = useMemo(() => {
+    if (dashboardData.uptime.formatted !== '—') return dashboardData.uptime.formatted
+    if (dashboardData.connection.connected && dashboardData.updatedAt > 0) {
+      return `Active · ${formatRelativeTime(dashboardData.updatedAt)}`
+    }
+    return dashboardData.connection.connected ? 'Active' : '—'
+  }, [dashboardData.uptime.formatted, dashboardData.connection.connected, dashboardData.updatedAt])
 
-  const latestCostAmount = useMemo(() => {
-    const points = Array.isArray(costTimeseriesQuery.data)
-      ? [...costTimeseriesQuery.data]
-      : []
-    if (points.length === 0) return null
+  const usageSummaryText = buildUsageSummaryText(dashboardData)
+  const usageSummaryIsError = dashboardData.usageStatus === 'error' || dashboardData.usageStatus === 'timeout'
 
-    points.sort((left, right) => left.date.localeCompare(right.date))
-    const latest = points[points.length - 1]
-    if (!latest) return null
-    return Math.max(0, latest.amount)
-  }, [costTimeseriesQuery.data])
+  const visibleAlerts = dashboardData.alerts.filter((c) => !dismissedChips.has(c.id))
 
+  // Timeseries data for micro charts
+  const costChartData = useMemo(
+    () => dashboardData.timeseries.costByDay.map((p) => ({ date: p.date, value: p.amount })),
+    [dashboardData.timeseries.costByDay],
+  )
+  const sessionsChartData = useMemo(
+    () => dashboardData.timeseries.messagesByDay.map((p) => ({ date: p.date, value: p.count })),
+    [dashboardData.timeseries.messagesByDay],
+  )
+
+  const healthStatus = useMemo(() => {
+    if (!dashboardData.connection.connected) return 'offline' as const
+    if (dashboardData.uptime.seconds <= 0) return 'warning' as const
+    return 'healthy' as const
+  }, [dashboardData.connection.connected, dashboardData.uptime.seconds])
+
+  // ── Metric items (mobile card grid + desktop widget metrics row) ───────────
   const metricItems = useMemo<Array<WidgetGridItem>>(
     function buildMetricItems() {
       return [
@@ -633,12 +263,14 @@ export function DashboardScreen() {
           node: (
             <MetricsWidget
               title="Sessions"
-              value={systemStatus.totalSessions}
-              subtitle="Total sessions"
+              value={dashboardData.sessions.total}
+              subtitle="Active in 24h"
               icon={Activity01Icon}
               accent="cyan"
-              description="Total sessions observed by the gateway."
-              rawValue={`${systemStatus.totalSessions} sessions`}
+              description="Sessions active in the last 24 hours."
+              rawValue={`${dashboardData.sessions.total} sessions`}
+              chartData={sessionsChartData}
+              chartAccentClass="bg-cyan-500"
             />
           ),
         },
@@ -648,12 +280,12 @@ export function DashboardScreen() {
           node: (
             <MetricsWidget
               title="Active Agents"
-              value={systemStatus.activeAgents}
+              value={dashboardData.agents.active || dashboardData.agents.total}
               subtitle="Currently active"
               icon={UserGroupIcon}
               accent="orange"
               description="Agents currently running or processing work."
-              rawValue={`${systemStatus.activeAgents} active agents`}
+              rawValue={`${dashboardData.agents.active} active agents`}
             />
           ),
         },
@@ -662,144 +294,126 @@ export function DashboardScreen() {
           size: 'small',
           node: (
             <MetricsWidget
-              title="Cost"
-              value={heroCostQuery.isError ? '—' : (heroCostQuery.data ?? '—')}
-              subtitle="Billing period"
+              title="Cost Today"
+              value={costTodayDisplay}
+              subtitle="Today's spend"
               icon={ChartLineData02Icon}
               accent="emerald"
-              isError={heroCostQuery.isError}
-              onRetry={retryHeroCost}
-              trendPct={heroCostQuery.isError ? undefined : costTrendPct}
-              trendLabel={costTrendPct === undefined ? undefined : 'vs prev day'}
-              description="Estimated spend from gateway cost telemetry."
-              rawValue={
-                latestCostAmount === null
-                  ? heroCostQuery.data ?? 'Unavailable'
-                  : formatCurrency(latestCostAmount)
-              }
+              trendPct={dashboardData.cost.trend ?? undefined}
+              trendLabel={dashboardData.cost.trend !== null ? 'vs prev day' : undefined}
+              trendInverted
+              description="Today's estimated spend from gateway cost telemetry."
+              rawValue={costTodayDisplay}
+              chartData={costChartData}
+              chartAccentClass="bg-emerald-500"
             />
           ),
         },
         {
-          id: 'metric-uptime',
+          id: 'metric-messages',
           size: 'small',
           node: (
             <MetricsWidget
-              title="Uptime"
-              value={formatUptime(systemStatus.uptimeSeconds)}
-              subtitle="Gateway runtime"
-              icon={Timer02Icon}
-              accent="violet"
-              description="Time since the active gateway session started."
-              rawValue={`${systemStatus.uptimeSeconds}s`}
+              title="Messages"
+              value={dashboardData.usage.messages.total}
+              subtitle={`${dashboardData.usage.messages.user} user · ${dashboardData.usage.messages.assistant} assistant`}
+              icon={BubbleChatIcon}
+              accent="purple"
+              description="Total messages exchanged today across all sessions."
+              rawValue={`${dashboardData.usage.messages.total} messages`}
             />
           ),
         },
       ]
     },
     [
-      heroCostQuery.data,
-      heroCostQuery.isError,
-      latestCostAmount,
-      retryHeroCost,
-      costTrendPct,
-      systemStatus.activeAgents,
-      systemStatus.totalSessions,
-      systemStatus.uptimeSeconds,
+      costTodayDisplay,
+      costChartData,
+      sessionsChartData,
+      dashboardData.agents.active,
+      dashboardData.agents.total,
+      dashboardData.cost.trend,
+      dashboardData.sessions.total,
+      dashboardData.status,
+      dashboardData.usage.messages.total,
+      dashboardData.usage.messages.user,
+      dashboardData.usage.messages.assistant,
+      refetch,
     ],
   )
 
-  const desktopWidgetItems = useMemo<Array<WidgetGridItem>>(
-    function buildDesktopWidgetItems() {
-      const items: Array<WidgetGridItem> = []
+  void metricItems
 
-      for (const widgetId of visibleIds) {
-        if (widgetId === 'skills') {
-          items.push({
-            id: widgetId,
-            size: 'medium',
-            node: <SkillsWidget onRemove={() => removeWidget('skills')} />,
-          })
-          continue
-        }
+  // ── Enterprise desktop layout ──────────────────────────────────────────────
+  // C2: SystemGlance → chips → Usage+Squad → Sessions+Tasks → Activity → Skills
 
-        if (widgetId === 'usage-meter') {
-          items.push({
-            id: widgetId,
-            size: 'medium',
-            node: <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} />,
-          })
-          continue
-        }
+  const desktopLayout = useMemo(
+    function buildDesktopLayout() {
+      return {
+        showServices: visibleWidgetSet.has('services-health'),
+        showScheduledJobs: visibleWidgetSet.has('scheduled-jobs'),
+        showUsage: visibleWidgetSet.has('usage-meter'),
+        showSquad: visibleWidgetSet.has('agent-status'),
+        showSessions: visibleWidgetSet.has('recent-sessions'),
+        showTasks: visibleWidgetSet.has('tasks'),
+        showActivity: visibleWidgetSet.has('activity-log'),
+        showSkills: visibleWidgetSet.has('skills'),
+        showNotifications: visibleWidgetSet.has('notifications'),
+      }
+    },
+    [visibleWidgetSet],
+  )
 
-        if (widgetId === 'tasks') {
-          items.push({
-            id: widgetId,
-            size: 'medium',
-            node: <TasksWidget onRemove={() => removeWidget('tasks')} />,
-          })
-          continue
-        }
+  // ── Mobile deep sections ────────────────────────────────────────────────────
+  const mobileDeepSections = useMemo<Array<MobileWidgetSection>>(
+    function buildMobileDeepSections() {
+      const sections: Array<MobileWidgetSection> = []
+      const deepTierOrder = widgetOrder.filter((id) =>
+        ['services', 'scheduled-jobs', 'activity', 'agents', 'sessions', 'tasks', 'skills', 'usage'].includes(id),
+      )
 
-        if (widgetId === 'agent-status') {
-          items.push({
+      for (const widgetId of deepTierOrder) {
+        if (widgetId === 'services') {
+          if (!visibleWidgetSet.has('services-health')) continue
+          sections.push({
             id: widgetId,
-            size: 'medium',
-            node: <AgentStatusWidget onRemove={() => removeWidget('agent-status')} />,
-          })
-          continue
-        }
-
-        if (widgetId === 'recent-sessions') {
-          items.push({
-            id: widgetId,
-            size: 'medium',
-            node: (
-              <RecentSessionsWidget
-                onOpenSession={(sessionKey) =>
-                  navigate({
-                    to: '/chat/$sessionKey',
-                    params: { sessionKey },
-                  })
-                }
-                onRemove={() => removeWidget('recent-sessions')}
-              />
+            label: 'Services',
+            content: (
+              <div className="w-full">
+                <CollapsibleWidget
+                  title="Services"
+                  summary={dashboardData.connection.connected ? 'Gateway connected' : 'Gateway disconnected'}
+                  defaultOpen={false}
+                >
+                  <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                    <ServicesHealthWidget
+                      gatewayConnected={dashboardData.connection.connected}
+                      onRemove={() => removeWidget('services-health')}
+                    />
+                  </ErrorBoundary>
+                </CollapsibleWidget>
+              </div>
             ),
           })
           continue
         }
 
-        if (widgetId === 'notifications') {
-          items.push({
+        if (widgetId === 'scheduled-jobs') {
+          if (!visibleWidgetSet.has('scheduled-jobs')) continue
+          sections.push({
             id: widgetId,
-            size: 'medium',
-            node: <NotificationsWidget onRemove={() => removeWidget('notifications')} />,
+            label: 'Scheduled',
+            content: (
+              <div className="w-full">
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <ScheduledJobsWidget onRemove={() => removeWidget('scheduled-jobs')} />
+                </ErrorBoundary>
+              </div>
+            ),
           })
           continue
         }
 
-        if (widgetId === 'activity-log') {
-          items.push({
-            id: widgetId,
-            size: 'large',
-            node: <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />,
-          })
-        }
-      }
-
-      return items
-    },
-    [navigate, removeWidget, visibleIds],
-  )
-
-  const mobileDeepSections = useMemo<Array<MobileWidgetSection>>(
-    function buildMobileDeepSections() {
-      const sections: Array<MobileWidgetSection> = []
-      const deepTierOrder = widgetOrder.filter((id) =>
-        ['activity', 'agents', 'sessions', 'tasks', 'skills', 'usage'].includes(id),
-      )
-
-      for (const widgetId of deepTierOrder) {
         if (widgetId === 'activity') {
           if (!visibleWidgetSet.has('activity-log')) continue
           sections.push({
@@ -807,7 +421,9 @@ export function DashboardScreen() {
             label: 'Activity',
             content: (
               <div className="w-full">
-                <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
+                </ErrorBoundary>
               </div>
             ),
           })
@@ -821,7 +437,9 @@ export function DashboardScreen() {
             label: 'Agents',
             content: (
               <div className="w-full">
-                <AgentStatusWidget onRemove={() => removeWidget('agent-status')} />
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <SquadStatusWidget />
+                </ErrorBoundary>
               </div>
             ),
           })
@@ -835,15 +453,17 @@ export function DashboardScreen() {
             label: 'Sessions',
             content: (
               <div className="w-full">
-                <RecentSessionsWidget
-                  onOpenSession={(sessionKey) =>
-                    navigate({
-                      to: '/chat/$sessionKey',
-                      params: { sessionKey },
-                    })
-                  }
-                  onRemove={() => removeWidget('recent-sessions')}
-                />
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <RecentSessionsWidget
+                    onOpenSession={(sessionKey) =>
+                      navigate({
+                        to: '/chat/$sessionKey',
+                        params: { sessionKey },
+                      })
+                    }
+                    onRemove={() => removeWidget('recent-sessions')}
+                  />
+                </ErrorBoundary>
               </div>
             ),
           })
@@ -859,10 +479,12 @@ export function DashboardScreen() {
               <div className="w-full">
                 <CollapsibleWidget
                   title="Tasks"
-                  summary={`Tasks: ${taskSummary.inProgress} in progress • ${taskSummary.done} done`}
+                  summary={`Tasks: ${dashboardData.cron.inProgress} in progress • ${dashboardData.cron.done} done`}
                   defaultOpen
                 >
-                  <TasksWidget onRemove={() => removeWidget('tasks')} />
+                  <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                    <TasksWidget onRemove={() => removeWidget('tasks')} />
+                  </ErrorBoundary>
                 </CollapsibleWidget>
               </div>
             ),
@@ -879,10 +501,12 @@ export function DashboardScreen() {
               <div className="w-full">
                 <CollapsibleWidget
                   title="Skills"
-                  summary={`Skills: ${enabledSkillsCount} enabled`}
+                  summary={`Skills: ${dashboardData.skills.enabled} enabled`}
                   defaultOpen={false}
                 >
-                  <SkillsWidget onRemove={() => removeWidget('skills')} />
+                  <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                    <SkillsWidget onRemove={() => removeWidget('skills')} />
+                  </ErrorBoundary>
                 </CollapsibleWidget>
               </div>
             ),
@@ -899,13 +523,13 @@ export function DashboardScreen() {
               <div className="w-full">
                 <CollapsibleWidget
                   title="Usage Meter"
-                  summary={usageSummary.text}
+                  summary={usageSummaryText}
                   defaultOpen={false}
                   action={
-                    usageSummary.state === 'error' ? (
+                    usageSummaryIsError ? (
                       <button
                         type="button"
-                        onClick={retryUsageSummary}
+                        onClick={refetch}
                         className="rounded-md border border-red-200 bg-red-50/80 px-1.5 py-0.5 text-[10px] font-medium text-red-700 transition-colors hover:bg-red-100"
                       >
                         Retry
@@ -913,19 +537,21 @@ export function DashboardScreen() {
                     ) : null
                   }
                 >
-                  {usageSummary.state === 'error' ? (
+                  {usageSummaryIsError ? (
                     <div className="rounded-lg border border-red-200 bg-red-50/80 px-3 py-2 text-sm text-red-700">
                       <p className="font-medium">Usage unavailable</p>
                       <button
                         type="button"
-                        onClick={retryUsageSummary}
+                        onClick={refetch}
                         className="mt-2 rounded-md border border-red-200 bg-red-100/80 px-2 py-1 text-xs font-medium transition-colors hover:bg-red-100"
                       >
                         Retry
                       </button>
                     </div>
                   ) : (
-                    <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} />
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
+                    </ErrorBoundary>
                   )}
                 </CollapsibleWidget>
               </div>
@@ -937,14 +563,15 @@ export function DashboardScreen() {
       return sections
     },
     [
-      enabledSkillsCount,
+      dashboardData.cron.done,
+      dashboardData.cron.inProgress,
+      dashboardData.connection.connected,
+      dashboardData.skills.enabled,
       navigate,
+      refetch,
       removeWidget,
-      retryUsageSummary,
-      taskSummary.done,
-      taskSummary.inProgress,
-      usageSummary.state,
-      usageSummary.text,
+      usageSummaryIsError,
+      usageSummaryText,
       visibleWidgetSet,
       widgetOrder,
     ],
@@ -965,13 +592,43 @@ export function DashboardScreen() {
     [mobileDeepSections, moveWidget, widgetOrder],
   )
 
+  // Pull-to-refresh indicator offset
+  const pullIndicatorStyle = isPulling
+    ? { transform: `translateY(${Math.min(pullDistance - 8, 48)}px)`, opacity: Math.min(pullDistance / threshold, 1) }
+    : undefined
+
   return (
     <>
       <main
-        className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 md:px-6 md:pt-8 md:pb-8"
+        ref={mainScrollRef as RefObject<HTMLElement>}
+        className="h-full overflow-x-hidden overflow-y-auto bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)] px-4 pt-3 pb-24 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 dark:text-neutral-100 md:px-6 md:pt-8 md:pb-8"
       >
+        {/* Pull-to-refresh indicator (mobile) */}
+        {isMobile && isPulling ? (
+          <div
+            className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2 transition-all duration-150"
+            style={pullIndicatorStyle}
+            aria-hidden
+          >
+            <div className="flex items-center gap-1.5 rounded-full border border-primary-200 bg-white/90 px-3 py-1.5 shadow-md backdrop-blur-sm dark:border-neutral-700 dark:bg-neutral-900/90">
+              <span
+                className={cn(
+                  'size-3 rounded-full border-2 border-accent-500',
+                  pullDistance >= threshold
+                    ? 'border-t-transparent animate-spin'
+                    : 'opacity-50',
+                )}
+              />
+              <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">
+                {pullDistance >= threshold ? 'Release to refresh' : 'Pull to refresh'}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
         <section className="mx-auto w-full max-w-[1600px]">
-          <header className="relative z-20 mb-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm md:mb-5 md:px-5 md:py-3">
+          {/* ── Header ─────────────────────────────────────────────────────── */}
+          <header className="relative z-20 mb-3 rounded-xl border border-primary-200 bg-primary-50/95 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)] px-3 py-2 md:mb-5 md:px-5 md:py-3">
             <div className="flex items-center justify-between gap-3">
               {/* Left: Logo + name + status */}
               <div className="flex min-w-0 items-center gap-2.5">
@@ -984,8 +641,8 @@ export function DashboardScreen() {
                   >
                     <OpenClawStudioIcon className="size-8 rounded-xl shadow-sm" />
                     {shouldShowLogoTip ? (
-                      <div className="absolute !left-1/2 top-full z-30 mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-1 duratrion-300">
-                        <div className="relative rounded bg-primary-900 px-2 py-1 text-xs font-medium text-white shadow-md ">
+                      <div className="absolute !left-1/2 top-full z-30 mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-1 duration-300">
+                        <div className="relative rounded bg-primary-900 px-2 py-1 text-xs font-medium text-white shadow-md">
                           <span
                             role="button"
                             tabIndex={0}
@@ -1009,21 +666,20 @@ export function DashboardScreen() {
                     ClawSuite
                   </h1>
                   {isMobile ? (
-                    /* Mobile: simple status dot — tooltip via title */
                     <span
                       className={cn(
                         'size-2 shrink-0 rounded-full',
-                        systemStatus.gateway.connected
+                        dashboardData.connection.connected
                           ? 'bg-emerald-500'
                           : 'bg-red-500',
                       )}
-                      title={systemStatus.gateway.connected ? 'Connected' : 'Disconnected'}
+                      title={dashboardData.connection.connected ? 'Connected' : 'Disconnected'}
                     />
                   ) : (
                     <span
                       className={cn(
                         'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                        systemStatus.gateway.connected
+                        dashboardData.connection.connected
                           ? 'border-emerald-200 bg-emerald-100/70 text-emerald-700'
                           : 'border-red-200 bg-red-100/80 text-red-700',
                       )}
@@ -1031,12 +687,12 @@ export function DashboardScreen() {
                       <span
                         className={cn(
                           'size-1.5 shrink-0 rounded-full',
-                          systemStatus.gateway.connected
+                          dashboardData.connection.connected
                             ? 'bg-emerald-500'
                             : 'bg-red-500',
                         )}
                       />
-                      {systemStatus.gateway.connected ? 'Connected' : 'Disconnected'}
+                      {dashboardData.connection.connected ? 'Connected' : 'Disconnected'}
                     </span>
                   )}
                 </div>
@@ -1052,7 +708,7 @@ export function DashboardScreen() {
                     <button
                       type="button"
                       onClick={() => setDashSettingsOpen(true)}
-                      className="inline-flex size-7 items-center justify-center rounded-full text-primary-600 dark:text-primary-400 transition-colors hover:bg-primary-50 dark:hover:bg-gray-800 hover:text-accent-600 dark:hover:text-accent-400"
+                      className="inline-flex size-7 items-center justify-center rounded-full text-primary-600 dark:text-primary-400 transition-colors hover:bg-primary-50 dark:hover:bg-primary-800 hover:text-accent-600 dark:hover:text-accent-400"
                       aria-label="Settings"
                       title="Settings"
                     >
@@ -1066,43 +722,11 @@ export function DashboardScreen() {
                 )}
                 {isMobile && (
                   <>
-                    {mobileEditMode ? (
-                      <>
-                        <AddWidgetPopover
-                          visibleIds={visibleIds}
-                          onAdd={addWidget}
-                          compact
-                          buttonClassName="size-8 !px-0 !py-0 justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-500 shadow-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleResetLayout}
-                          className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-500 shadow-sm transition-colors hover:text-primary-700 active:scale-95"
-                          aria-label="Reset Layout"
-                          title="Reset Layout"
-                        >
-                          <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.5} />
-                        </button>
-                      </>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => setMobileEditMode((p) => !p)}
-                      className={cn(
-                        'inline-flex size-8 items-center justify-center rounded-full border shadow-sm transition-colors active:scale-95',
-                        mobileEditMode
-                          ? 'border-accent-300 bg-accent-50 text-accent-600'
-                          : 'border-primary-200 bg-primary-100/80 text-primary-500 hover:text-primary-700',
-                      )}
-                      aria-label={mobileEditMode ? 'Done editing' : 'Edit layout'}
-                      title={mobileEditMode ? 'Done editing' : 'Edit layout'}
-                    >
-                      <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.6} />
-                    </button>
+                    {/* D1: Edit controls moved to inline row above grid — keep header clean */}
                     <button
                       type="button"
                       onClick={() => updateSettings({ theme: nextTheme })}
-                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 active:scale-95"
+                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-primary-800 active:scale-95"
                       aria-label={`Switch theme to ${nextTheme}`}
                       title={`Theme: ${theme} (tap for ${nextTheme})`}
                     >
@@ -1115,7 +739,7 @@ export function DashboardScreen() {
                     <button
                       type="button"
                       onClick={() => setDashSettingsOpen(true)}
-                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 active:scale-95"
+                      className="inline-flex size-8 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-600 shadow-sm transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-primary-800 active:scale-95"
                       aria-label="Dashboard settings"
                       title="Settings"
                     >
@@ -1129,141 +753,389 @@ export function DashboardScreen() {
                 )}
               </div>
             </div>
-
           </header>
 
-          {/* Activity ticker — keep full banner behavior on desktop */}
-          <div className="hidden md:block">
-            <ActivityTicker />
-          </div>
-
-          {!isMobile && dashboardSignalChips.length > 0 ? (
-            <div className="mb-3 flex flex-wrap gap-2">
-              {dashboardSignalChips.map((chip) => (
-                <span
-                  key={chip.id}
-                  className={cn(
-                    'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium',
-                    chip.severity === 'red'
-                      ? 'border-red-200 bg-red-100/75 text-red-700'
-                      : 'border-amber-200 bg-amber-100/75 text-amber-700',
-                  )}
+          {dashboardData.status === 'error' ? (
+            <div className="mb-3 rounded-xl border border-red-200 bg-red-50/85 px-3 py-2 text-sm text-red-800 shadow-sm dark:border-red-900 dark:bg-red-950/50 dark:text-red-300 md:mb-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-medium">Dashboard data failed to load</p>
+                  <p className="text-xs text-red-700/90">
+                    One or more dashboard queries failed. Retry to refresh data.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={refetch}
+                  className="shrink-0 rounded-md border border-red-200 bg-white/80 px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-white dark:hover:bg-white/10"
                 >
-                  {chip.text}
-                </span>
-              ))}
+                  Retry
+                </button>
+              </div>
             </div>
           ) : null}
 
-          {!isMobile ? <WidgetGrid items={metricItems} className="mb-3 md:mb-4" /> : null}
+          {/* ── Mobile layout ───────────────────────────────────────────────── */}
+          {isMobile ? (
+            <div className="flex flex-col gap-3">
+              {/* SystemGlance compact removed on mobile — redundant with Token Usage widget below */}
 
-          {/* Inline widget controls — desktop only (mobile controls are in header) */}
-          {!isMobile && (
-            <div className="mb-3 flex items-center justify-end gap-2">
-              <AddWidgetPopover visibleIds={visibleIds} onAdd={addWidget} />
-              <button
-                type="button"
-                onClick={handleResetLayout}
-                className="inline-flex items-center gap-1 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] text-primary-600 transition-colors hover:border-accent-200 hover:text-accent-600 dark:border-gray-700 dark:bg-gray-800 dark:text-primary-400 dark:hover:border-accent-600 dark:hover:text-accent-400"
-                aria-label="Reset Layout"
-                title="Reset Layout"
-              >
-                <HugeiconsIcon icon={RefreshIcon} size={20} strokeWidth={1.5} />
-                <span>Reset</span>
-              </button>
-            </div>
-          )}
-
-          <div>
-            {isMobile ? (
-              <div className="flex flex-col gap-3">
-                <div className="space-y-1.5">
-                  <NowCard
-                    gatewayConnected={systemStatus.gateway.connected}
-                    activeAgents={systemStatus.activeAgents}
-                    activeTasks={taskSummary.inProgress}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  {dashboardSignalChips.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {dashboardSignalChips.map((chip) => (
-                        <span
-                          key={chip.id}
+              {/* Alert signal chips — only one top-of-page clutter element */}
+              {visibleAlerts.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {visibleAlerts.map((chip) => (
+                    <span
+                      key={chip.id}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
+                        chip.severity === 'red'
+                          ? 'border-red-200 bg-red-100/75 text-red-700'
+                          : 'border-amber-200 bg-amber-100/75 text-amber-700',
+                      )}
+                    >
+                      {chip.text}
+                      {chip.dismissable !== false && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDismissedChips((prev) => {
+                              const next = new Set(prev)
+                              next.add(chip.id)
+                              try { window.localStorage.setItem('clawsuite-dismissed-chips', JSON.stringify([...next])) } catch {}
+                              return next
+                            })
+                          }}
                           className={cn(
-                            'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium',
-                            chip.severity === 'red'
-                              ? 'border-red-200 bg-red-100/75 text-red-700'
-                              : 'border-amber-200 bg-amber-100/75 text-amber-700',
+                            'ml-0.5 rounded-full p-0.5 transition-colors',
+                            chip.severity === 'red' ? 'text-red-400 hover:text-red-700 active:bg-red-200' : 'text-amber-400 hover:text-amber-700 active:bg-amber-200',
                           )}
+                          aria-label={`Dismiss ${chip.text}`}
                         >
-                          {chip.text}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                  <WidgetGrid items={metricItems} className="gap-3" />
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 3l6 6M9 3l-6 6"/></svg>
+                        </button>
+                      )}
+                    </span>
+                  ))}
                 </div>
+              ) : null}
 
-                <div className="space-y-1.5">
-                  {mobileDeepSections.map((section, visibleIndex) => {
-                    const canMoveUp = visibleIndex > 0
-                    const canMoveDown =
-                      visibleIndex < mobileDeepSections.length - 1
+              {/* MOB-5: Widget cards replacing quick actions — matches desktop layout */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <button
+                  type="button"
+                  onClick={() => void navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })}
+                  className="flex flex-col gap-2 rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-3 text-left shadow-sm active:scale-[0.98] hover:border-accent-300 transition-all dark:border-neutral-800 dark:bg-neutral-900/60"
+                >
+                  <span className="flex size-8 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M18 10c0 4.418-3.582 8-8 8a8.036 8.036 0 0 1-3.9-1L2 18l1.2-4A7.959 7.959 0 0 1 2 10c0-4.418 3.582-8 8-8s8 3.582 8 8Z"/></svg>
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-ink truncate">Chat</p>
+                    <p className="text-[10px] text-primary-500 dark:text-neutral-400">Start a session</p>
+                  </div>
+                </button>
 
-                    return (
-                      <div key={section.id} className="relative w-full rounded-xl">
-                        {mobileEditMode ? (
-                          <div className="absolute right-1 top-1 z-10 flex gap-0.5 rounded-full border border-primary-200/80 bg-primary-50/90 p-0.5 shadow-sm">
-                            {canMoveUp ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  moveMobileSection(visibleIndex, visibleIndex - 1)
-                                }
-                                className="inline-flex size-5 items-center justify-center rounded-full text-primary-400 transition-colors hover:text-primary-600"
-                                aria-label={`Move ${section.label} up`}
-                                title={`Move ${section.label} up`}
-                              >
-                                <HugeiconsIcon
-                                  icon={ArrowUp02Icon}
-                                  size={12}
-                                  strokeWidth={1.8}
-                                />
-                              </button>
-                            ) : null}
-                            {canMoveDown ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  moveMobileSection(visibleIndex, visibleIndex + 1)
-                                }
-                                className="inline-flex size-5 items-center justify-center rounded-full text-primary-400 transition-colors hover:text-primary-600"
-                                aria-label={`Move ${section.label} down`}
-                                title={`Move ${section.label} down`}
-                              >
-                                <HugeiconsIcon
-                                  icon={ArrowDown01Icon}
-                                  size={12}
-                                  strokeWidth={1.8}
-                                />
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : null}
-                        {section.content}
-                      </div>
-                    )
-                  })}
+                <button
+                  type="button"
+                  onClick={() => void navigate({ to: '/agent-swarm' })}
+                  className="flex flex-col gap-2 rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-3 text-left shadow-sm active:scale-[0.98] hover:border-orange-300 transition-all dark:border-neutral-800 dark:bg-neutral-900/60"
+                >
+                  <span className="flex size-8 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="6" height="8" rx="1"/><rect x="12" y="6" width="6" height="8" rx="1"/><path d="M8 10h4M10 8v4"/></svg>
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-ink truncate">Agent Hub</p>
+                    <p className="text-[10px] text-primary-500 dark:text-neutral-400">
+                      {dashboardData.agents.active > 0
+                        ? `${dashboardData.agents.active} active`
+                        : 'Manage agents'}
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void navigate({ to: '/skills' })}
+                  className="flex flex-col gap-2 rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-3 text-left shadow-sm active:scale-[0.98] hover:border-violet-300 transition-all dark:border-neutral-800 dark:bg-neutral-900/60"
+                >
+                  <span className="flex size-8 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 9.5A6 6 0 0 1 10 4a6 6 0 0 1 6.5 5.5C16.5 13 14 16 10 17c-4-1-6.5-4-6.5-7.5Z"/><circle cx="10" cy="10" r="2"/></svg>
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-ink truncate">Skills</p>
+                    <p className="text-[10px] text-primary-500 dark:text-neutral-400">
+                      {dashboardData.skills.enabled > 0
+                        ? `${dashboardData.skills.enabled} enabled`
+                        : 'Browse skills'}
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void navigate({ to: '/costs' })}
+                  className="flex flex-col gap-2 rounded-xl border border-primary-200 bg-primary-50/80 px-3 py-3 text-left shadow-sm active:scale-[0.98] hover:border-emerald-300 transition-all dark:border-neutral-800 dark:bg-neutral-900/60"
+                >
+                  <span className="flex size-8 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2v2m0 12v2m8-8h-2M4 10H2m12.24-5.76-1.42 1.42M5.18 14.82l-1.42 1.42M16.24 14.24l-1.42-1.42M5.18 5.18 3.76 3.76"/><circle cx="10" cy="10" r="4"/></svg>
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-ink truncate">Costs</p>
+                    <p className="text-[10px] text-primary-500 dark:text-neutral-400">{costTodayDisplay} today</p>
+                  </div>
+                </button>
+              </div>
+
+              <CollapsibleWidget
+                title="Token Usage"
+                summary={`${costTodayDisplay} today • ${dashboardData.sessions.active || dashboardData.agents.active || 0} active sessions`}
+                defaultOpen={false}
+                className="bg-primary-50/70"
+                contentClassName="pt-2"
+              >
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <TokenUsageHero data={dashboardData} />
+                </ErrorBoundary>
+              </CollapsibleWidget>
+
+              {/* MetricCards intentionally omitted on mobile — SystemGlance above is the canonical hero */}
+
+              {/* D1: Inline widget control row above grid — replaces header edit button */}
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-primary-500 dark:text-neutral-400">Widgets</p>
+                <div className="flex items-center gap-1.5">
+                  <AddWidgetPopover
+                    visibleIds={visibleIds}
+                    onAdd={addWidget}
+                    compact
+                    buttonClassName="size-7 !px-0 !py-0 justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-500 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMobileEditMode((p) => !p)}
+                    className={cn(
+                      'inline-flex size-7 items-center justify-center rounded-full border shadow-sm transition-colors active:scale-95',
+                      mobileEditMode
+                        ? 'border-accent-300 bg-accent-50 text-accent-600 dark:border-accent-600 dark:bg-accent-950'
+                        : 'border-primary-200 bg-primary-100/80 text-primary-500 hover:text-primary-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
+                    )}
+                    aria-label={mobileEditMode ? 'Done editing' : 'Edit layout'}
+                    title={mobileEditMode ? 'Done editing' : 'Edit layout'}
+                  >
+                    <HugeiconsIcon icon={PencilEdit02Icon} size={13} strokeWidth={1.6} />
+                  </button>
+                  {mobileEditMode ? (
+                    <button
+                      type="button"
+                      onClick={handleResetLayout}
+                      className="inline-flex size-7 items-center justify-center rounded-full border border-primary-200 bg-primary-100/80 text-primary-500 shadow-sm transition-colors hover:text-primary-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 active:scale-95"
+                      aria-label="Reset Layout"
+                      title="Reset Layout"
+                    >
+                      <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.5} />
+                    </button>
+                  ) : null}
                 </div>
               </div>
-            ) : (
-              <WidgetGrid items={desktopWidgetItems} />
-            )}
-          </div>
+
+              {/* Deep sections (reorderable) */}
+              <div className="space-y-1.5">
+                {mobileDeepSections.map((section, visibleIndex) => {
+                  const canMoveUp = visibleIndex > 0
+                  const canMoveDown = visibleIndex < mobileDeepSections.length - 1
+
+                  return (
+                    <div key={section.id} className="relative w-full rounded-xl">
+                      {mobileEditMode ? (
+                        <div className="absolute right-1 top-1 z-10 flex gap-0.5 rounded-full border border-primary-200/80 bg-primary-50/90 p-0.5 shadow-sm">
+                          {canMoveUp ? (
+                            <button
+                              type="button"
+                              onClick={() => moveMobileSection(visibleIndex, visibleIndex - 1)}
+                              className="inline-flex size-5 items-center justify-center rounded-full text-primary-400 transition-colors hover:text-primary-600"
+                              aria-label={`Move ${section.label} up`}
+                            >
+                              <HugeiconsIcon icon={ArrowUp02Icon} size={12} strokeWidth={1.8} />
+                            </button>
+                          ) : null}
+                          {canMoveDown ? (
+                            <button
+                              type="button"
+                              onClick={() => moveMobileSection(visibleIndex, visibleIndex + 1)}
+                              className="inline-flex size-5 items-center justify-center rounded-full text-primary-400 transition-colors hover:text-primary-600"
+                              aria-label={`Move ${section.label} down`}
+                            >
+                              <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={1.8} />
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {section.content}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            /* ── Desktop enterprise layout (C2) ─────────────────────────────── */
+            <div className="flex flex-col gap-4">
+              {/* 1. SystemGlance */}
+              <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                <SystemGlance
+                  sessions={dashboardData.sessions.total}
+                  activeAgents={dashboardData.agents.active || dashboardData.agents.total}
+                  costToday={costTodayDisplay}
+                  uptimeFormatted={uptimeDisplay}
+                  updatedAgo={formatRelativeTime(dashboardData.updatedAt)}
+                  healthStatus={healthStatus}
+                  gatewayConnected={dashboardData.connection.connected}
+                  sessionPercent={dashboardData.usage.contextPercent ?? undefined}
+                  providers={dashboardData.cost.byProvider}
+                  currentModel={dashboardData.model.current}
+                  actions={
+                    <>
+                      <AddWidgetPopover visibleIds={visibleIds} onAdd={addWidget} />
+                      <button
+                        type="button"
+                        onClick={handleResetLayout}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
+                        aria-label="Reset Layout"
+                        title="Reset Layout"
+                      >
+                        <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.5} />
+                        <span>Reset</span>
+                      </button>
+                    </>
+                  }
+                />
+              </ErrorBoundary>
+
+              {/* 2. Alert chips */}
+              {visibleAlerts.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {visibleAlerts.map((chip) => (
+                    <span
+                      key={chip.id}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
+                        chip.severity === 'red'
+                          ? 'border-red-200 bg-red-100/75 text-red-700'
+                          : 'border-amber-200 bg-amber-100/75 text-amber-700',
+                      )}
+                    >
+                      {chip.text}
+                      {chip.dismissable && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDismissedChips((prev) => {
+                              const next = new Set(prev)
+                              next.add(chip.id)
+                              try { window.localStorage.setItem('clawsuite-dismissed-chips', JSON.stringify([...next])) } catch {}
+                              return next
+                            })
+                          }}
+                          className={cn(
+                            'ml-0.5 rounded-full p-0.5 transition-colors hover:bg-black/10',
+                            chip.severity === 'red' ? 'text-red-500 hover:text-red-800' : 'text-amber-500 hover:text-amber-800',
+                          )}
+                          aria-label={`Dismiss ${chip.text}`}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                <TokenUsageHero data={dashboardData} />
+              </ErrorBoundary>
+
+              {desktopLayout.showServices ? (
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <ServicesHealthWidget
+                    gatewayConnected={dashboardData.connection.connected}
+                    onRemove={() => removeWidget('services-health')}
+                  />
+                </ErrorBoundary>
+              ) : null}
+
+              {desktopLayout.showScheduledJobs ? (
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <ScheduledJobsWidget onRemove={() => removeWidget('scheduled-jobs')} />
+                </ErrorBoundary>
+              ) : null}
+
+              {/* 3. Two-up: Usage Today + Squad Status */}
+              {(desktopLayout.showUsage || desktopLayout.showSquad) && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {desktopLayout.showUsage && (
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <UsageMeterWidget onRemove={() => removeWidget('usage-meter')} overrideCost={dashboardData.cost.today} overrideTokens={dashboardData.usage.tokens} />
+                    </ErrorBoundary>
+                  )}
+                  {desktopLayout.showSquad && (
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <SquadStatusWidget />
+                    </ErrorBoundary>
+                  )}
+                </div>
+              )}
+
+              {/* 4. Two-up: Recent Sessions + Tasks */}
+              {(desktopLayout.showSessions || desktopLayout.showTasks) && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {desktopLayout.showSessions && (
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <RecentSessionsWidget
+                        onOpenSession={(sessionKey) =>
+                          navigate({
+                            to: '/chat/$sessionKey',
+                            params: { sessionKey },
+                          })
+                        }
+                        onRemove={() => removeWidget('recent-sessions')}
+                      />
+                    </ErrorBoundary>
+                  )}
+                  {desktopLayout.showTasks && (
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <TasksWidget onRemove={() => removeWidget('tasks')} />
+                    </ErrorBoundary>
+                  )}
+                </div>
+              )}
+
+              {/* 5. Full-width: Activity Log */}
+              {desktopLayout.showActivity && (
+                <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                  <ActivityLogWidget onRemove={() => removeWidget('activity-log')} />
+                </ErrorBoundary>
+              )}
+
+              {/* 6. Skills + Notifications */}
+              {(desktopLayout.showSkills || desktopLayout.showNotifications) && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {desktopLayout.showSkills && (
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <SkillsWidget onRemove={() => removeWidget('skills')} />
+                    </ErrorBoundary>
+                  )}
+                  {desktopLayout.showNotifications && (
+                    <ErrorBoundary title="Widget Error" description="This widget failed to load.">
+                      <NotificationsWidget onRemove={() => removeWidget('notifications')} />
+                    </ErrorBoundary>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </section>
       </main>
+
+      {showSystemMetricsFooter ? <SystemMetricsFooter /> : null}
 
       <SettingsDialog
         open={dashSettingsOpen}

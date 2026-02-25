@@ -2,7 +2,6 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDown01Icon,
   Idea01Icon,
-  Wrench01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -19,8 +18,6 @@ import type {
 import type { ToolPart } from '@/components/prompt-kit/tool'
 import { Message, MessageContent } from '@/components/prompt-kit/message'
 import { AssistantAvatar, UserAvatar } from '@/components/avatars'
-import { Tool } from '@/components/prompt-kit/tool'
-import { LoadingIndicator } from '@/components/loading-indicator'
 import {
   Collapsible,
   CollapsiblePanel,
@@ -32,15 +29,6 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { cn } from '@/lib/utils'
-
-// Streaming cursor component — enhanced visibility
-function StreamingCursor() {
-  return (
-    <span className="inline-flex items-center ml-0.5">
-      <span className="size-1.5 rounded-full bg-primary-600 animate-pulse" />
-    </span>
-  )
-}
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
@@ -104,9 +92,18 @@ function getWordBoundaryIndex(text: string, wordCount: number): number {
   return text.length
 }
 
+type StreamToolCall = {
+  id: string
+  name: string
+  phase: 'calling' | 'running' | 'done' | 'error'
+  args?: unknown
+  result?: string
+}
+
 type MessageItemProps = {
   message: GatewayMessage
   toolResultsByCallId?: Map<string, GatewayMessage>
+  toolCalls?: Array<StreamToolCall>
   onRetryMessage?: (message: GatewayMessage) => void
   forceActionsVisible?: boolean
   wrapperRef?: React.RefObject<HTMLDivElement | null>
@@ -229,19 +226,50 @@ function thinkingFromMessage(msg: GatewayMessage): string | null {
   return null
 }
 
-function summarizeToolNames(toolCalls: Array<ToolCallContent>): string {
-  const seen = new Set<string>()
-  const uniqueNames: Array<string> = []
-  for (const toolCall of toolCalls) {
-    const normalized = (toolCall.name || '').trim()
-    const name = normalized.length > 0 ? normalized : 'unknown'
-    if (seen.has(name)) continue
-    seen.add(name)
-    uniqueNames.push(name)
+function normalizeStreamToolPhase(
+  phase: unknown,
+): 'calling' | 'running' | 'done' | 'error' {
+  if (phase === 'calling') return 'calling'
+  if (phase === 'running') return 'running'
+  if (phase === 'done' || phase === 'result') return 'done'
+  if (phase === 'error' || phase === 'failed' || phase === 'failure') {
+    return 'error'
   }
-  if (uniqueNames.length === 0) return 'tools'
-  if (uniqueNames.length <= 3) return uniqueNames.join(', ')
-  return `${uniqueNames.slice(0, 3).join(', ')} +${uniqueNames.length - 3} more`
+  return 'running'
+}
+
+function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
+  const icons: Record<string, string> = {
+    web_search: '🔍',
+    Read: '📖',
+    exec: '⚡',
+    memory_search: '🧠',
+    memory_get: '🧠',
+    Write: '✏️',
+    Edit: '✏️',
+    browser: '🌐',
+  }
+
+  const icon = icons[toolCall.name] ?? '🔧'
+  const isDone = toolCall.phase === 'done'
+  const isError = toolCall.phase === 'error'
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+        isDone
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
+          : isError
+            ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400'
+            : 'border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400',
+      )}
+    >
+      {icon} {toolCall.name}
+      {isDone ? ' ✓' : null}
+      {isError ? ' ✗' : null}
+    </span>
+  )
 }
 
 function attachmentSource(attachment: GatewayAttachment | undefined): string {
@@ -255,9 +283,31 @@ function attachmentSource(attachment: GatewayAttachment | undefined): string {
   return ''
 }
 
+function attachmentExtension(attachment: GatewayAttachment): string {
+  const name = typeof attachment.name === 'string' ? attachment.name : ''
+  const fromName = name.split('.').pop()?.trim().toLowerCase() || ''
+  if (fromName) return fromName
+
+  const source = attachmentSource(attachment)
+  const fileName = source.split('?')[0]?.split('#')[0]?.split('/').pop() || ''
+  return fileName.split('.').pop()?.trim().toLowerCase() || ''
+}
+
+function isImageAttachment(attachment: GatewayAttachment): boolean {
+  const contentType =
+    typeof attachment.contentType === 'string'
+      ? attachment.contentType.trim().toLowerCase()
+      : ''
+  if (contentType.startsWith('image/')) return true
+
+  const ext = attachmentExtension(attachment)
+  return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'].includes(ext)
+}
+
 function MessageItemComponent({
   message,
   toolResultsByCallId,
+  toolCalls: streamToolCalls = [],
   onRetryMessage,
   forceActionsVisible = false,
   wrapperRef,
@@ -476,6 +526,22 @@ function MessageItemComponent({
   // Get tool calls from this message (for assistant messages)
   const toolCalls = role === 'assistant' ? getToolCallsFromMessage(message) : []
   const hasToolCalls = toolCalls.length > 0
+  const embeddedStreamToolCalls = useMemo(() => {
+    const value = (message as any).__streamToolCalls
+    if (!Array.isArray(value)) return []
+    return value
+      .map((entry: any) => ({
+        id: typeof entry?.id === 'string' ? entry.id : '',
+        name: typeof entry?.name === 'string' ? entry.name : 'tool',
+        phase: normalizeStreamToolPhase(entry?.phase),
+        args: entry?.args,
+        result: typeof entry?.result === 'string' ? entry.result : undefined,
+      }))
+      .filter((entry: any) => entry.id.length > 0)
+  }, [message])
+  const effectiveStreamToolCalls =
+    streamToolCalls.length > 0 ? streamToolCalls : embeddedStreamToolCalls
+  const hasStreamToolCalls = effectiveStreamToolCalls.length > 0
   const toolParts = useMemo(() => {
     return toolCalls.map((toolCall) => {
       const resultMessage = toolCall.id
@@ -484,18 +550,11 @@ function MessageItemComponent({
       return mapToolCallToToolPart(toolCall, resultMessage)
     })
   }, [toolCalls, toolResultsByCallId])
-  const toolSummary = useMemo(() => {
-    if (!hasToolCalls) return ''
-    const count = toolCalls.length
-    const toolLabel = count === 1 ? 'tool' : 'tools'
-    return `Used: ${summarizeToolNames(toolCalls)} (${count} ${toolLabel})`
-  }, [hasToolCalls, toolCalls])
   const hasToolErrors = useMemo(
     () => toolParts.some((toolPart) => toolPart.state === 'output-error'),
     [toolParts],
   )
   const [toolCallsOpen, setToolCallsOpen] = useState(false)
-
   useEffect(() => {
     if (expandAllToolSections) {
       setToolCallsOpen(true)
@@ -506,6 +565,28 @@ function MessageItemComponent({
   // The old "sending" status was misleading since the API call takes <100ms.
   const isQueued = false
   const isFailed = message.status === 'error'
+
+  // System message — minimal styled row, no bubble/avatar
+  if (role === 'system') {
+    return (
+      <div
+        ref={wrapperRef}
+        data-chat-message-role={role}
+        data-chat-message-id={wrapperDataMessageId}
+        style={
+          typeof wrapperScrollMarginTop === 'number'
+            ? { scrollMarginTop: `${wrapperScrollMarginTop}px` }
+            : undefined
+        }
+        className={cn(
+          'text-xs text-neutral-500 italic text-center py-1',
+          wrapperClassName,
+        )}
+      >
+        {fullText}
+      </div>
+    )
+  }
 
   return (
     <div
@@ -518,13 +599,23 @@ function MessageItemComponent({
           : undefined
       }
       className={cn(
-        'group flex flex-col',
+        'group relative flex flex-col',
         hasText || hasAttachments ? 'gap-0.5 md:gap-1' : 'gap-0',
         wrapperClassName,
         isUser ? 'items-end' : 'items-start',
         !isUser && isNew && 'animate-[message-fade-in_0.4s_ease-out]',
       )}
     >
+
+      {/* Bridge gap: thinking done but first text token not yet arrived */}
+      {effectiveIsStreaming && !thinking && !hasText && (
+        <div className="flex items-center gap-1.5 px-1 py-1">
+          <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:0ms]" />
+          <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:150ms]" />
+          <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:300ms]" />
+        </div>
+      )}
+
       {thinking && !hasText && (
         <div className="w-full max-w-[900px]">
           <Collapsible defaultOpen={false}>
@@ -537,7 +628,11 @@ function MessageItemComponent({
               />
               <span>💭 Thinking...</span>
               {effectiveIsStreaming ? (
-                <LoadingIndicator ariaLabel="Assistant thinking" />
+                <span className="flex items-center gap-1">
+                  <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:0ms]" />
+                  <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:150ms]" />
+                  <span className="size-1.5 animate-bounce rounded-full bg-primary-400 [animation-delay:300ms]" />
+                </span>
               ) : null}
               <HugeiconsIcon
                 icon={ArrowDown01Icon}
@@ -559,7 +654,7 @@ function MessageItemComponent({
       {/* Narration messages (tool-call activity) — compact collapsible row */}
       {!isUser && (message as any).__isNarration && hasText && (
         <div className="w-full max-w-[900px]">
-          <details className="group/narration rounded-lg border border-primary-200/50 bg-primary-50/30 hover:bg-primary-50/50 transition-colors">
+          <details className="group/narration rounded-lg border border-primary-200/50 bg-primary-50/30 hover:bg-primary-50 dark:hover:bg-primary-800/50 transition-colors">
             <summary className="flex items-center gap-2 cursor-pointer select-none px-3 py-2 list-none [&::-webkit-details-marker]:hidden">
               <span className="size-6 flex items-center justify-center rounded-full bg-accent-500/15 shrink-0">
                 <span className="text-xs">⚡</span>
@@ -597,11 +692,11 @@ function MessageItemComponent({
             <div
               data-chat-message-bubble={isUser ? 'true' : undefined}
               className={cn(
-                'rounded-[12px] break-words whitespace-normal min-w-0 text-primary-900 flex flex-col gap-2',
+                'break-words whitespace-normal min-w-0 flex flex-col gap-2 px-3 py-2 max-w-[80%]',
                 '',
                 !isUser
-                  ? 'bg-transparent w-full'
-                  : 'bg-primary-100 max-w-[75%] rounded-2xl px-3 py-2 md:px-4 md:py-2.5',
+                  ? 'bg-primary-50 border border-primary-200 rounded-2xl rounded-tl-sm text-primary-900'
+                  : 'bg-accent-500 text-white rounded-2xl rounded-tr-sm',
                 isQueued && isUser && !isFailed && 'opacity-70',
                 isFailed && isUser && 'bg-red-50/50 border border-red-300',
                 bubbleClassName,
@@ -609,22 +704,46 @@ function MessageItemComponent({
             >
               {hasAttachments && (
                 <div className="flex flex-wrap gap-2">
-                  {attachments.map((attachment) => (
-                    <a
-                      key={attachment.id}
-                      href={attachmentSource(attachment)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block overflow-hidden rounded-lg border border-primary-200 hover:border-primary-400 transition-colors max-w-full"
-                    >
-                      <img
-                        src={attachmentSource(attachment)}
-                        alt={attachment.name || 'Attached image'}
-                        className="max-h-64 w-auto max-w-full object-contain"
-                        loading="lazy"
-                      />
-                    </a>
-                  ))}
+                  {attachments.map((attachment) => {
+                    const source = attachmentSource(attachment)
+                    const ext = attachmentExtension(attachment)
+                    const imageAttachment = isImageAttachment(attachment)
+
+                    if (imageAttachment) {
+                      return (
+                        <a
+                          key={attachment.id}
+                          href={source}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-lg border border-primary-200 hover:border-primary-400 transition-colors max-w-full"
+                        >
+                          <img
+                            src={source}
+                            alt={attachment.name || 'Attached image'}
+                            className="max-h-64 w-auto max-w-full object-contain"
+                            loading="lazy"
+                          />
+                        </a>
+                      )
+                    }
+
+                    return (
+                      <a
+                        key={attachment.id}
+                        href={source}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex max-w-full items-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-700 hover:border-primary-400"
+                      >
+                        <span>📄</span>
+                        <span className="truncate">{attachment.name || 'Attachment'}</span>
+                        <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] uppercase text-primary-600">
+                          {ext || 'file'}
+                        </span>
+                      </a>
+                    )
+                  })}
                 </div>
               )}
               {hasInlineImages && (
@@ -649,66 +768,82 @@ function MessageItemComponent({
               )}
               {hasText &&
                 (isUser ? (
-                  <span className="text-pretty max-h-[600px] overflow-y-auto">
+                  <span className="text-pretty">
                     {displayText}
                   </span>
                 ) : hasRevealedText ? (
-                  <div className="relative max-h-[800px] overflow-y-auto">
+                  <div className="relative">
                     <MessageContent
                       markdown
                       className={cn(
-                        'text-primary-900 bg-transparent w-full text-pretty',
+                        'text-primary-900 bg-transparent w-full text-pretty transition-all duration-100',
                         effectiveIsStreaming && 'chat-streaming-content',
+                        isUser && 'text-white',
                       )}
                     >
                       {assistantDisplayText}
                     </MessageContent>
-                    {effectiveIsStreaming && <StreamingCursor />}
+                    {effectiveIsStreaming && (
+                      <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-accent-500 align-text-bottom" />
+                    )}
                   </div>
                 ) : null)}
+              {!isUser && hasStreamToolCalls ? (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {effectiveStreamToolCalls.map((toolCall) => (
+                    <ToolCallPill key={toolCall.id} toolCall={toolCall} />
+                  ))}
+                </div>
+              ) : effectiveIsStreaming && !hasRevealedText ? (
+                <div className="mb-2 flex items-center gap-2 text-xs text-neutral-400">
+                  <span className="animate-pulse">⚡</span>
+                  <span>Working...</span>
+                </div>
+              ) : null}
+
               {effectiveIsStreaming && !hasRevealedText && (
-                <div className="flex items-center gap-1.5 py-1">
-                  <LoadingIndicator ariaLabel="Assistant is responding" />
+                <div className="flex items-center gap-1 px-1 py-0.5">
+                  <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:0ms]" />
+                  <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:150ms]" />
+                  <span className="size-1.5 rounded-full bg-primary-400 animate-bounce [animation-delay:300ms]" />
                 </div>
               )}
             </div>
           </Message>
         )}
 
-      {/* Render tool calls - only when message is tool-call-only (no text) */}
-      {hasToolCalls && !hasText && (
+      {/* Render tool calls — collapsible ▶ tool result style */}
+      {hasToolCalls && (
         <div className="w-full max-w-[900px] mt-2">
           <Collapsible open={toolCallsOpen} onOpenChange={setToolCallsOpen}>
-            <CollapsibleTrigger className="w-full justify-between bg-primary-50/50 hover:bg-primary-100/80 data-panel-open:bg-primary-100/80">
-              <span
-                className={cn(
-                  'size-2 shrink-0 rounded-full',
-                  hasToolErrors ? 'bg-red-500' : 'bg-emerald-500',
-                )}
-              />
-              <HugeiconsIcon
-                icon={Wrench01Icon}
-                size={20}
-                strokeWidth={1.5}
-                className="opacity-70"
-              />
-              <span className="flex-1 truncate text-left">{toolSummary}</span>
-              <HugeiconsIcon
-                icon={ArrowDown01Icon}
-                size={20}
-                strokeWidth={1.5}
-                className="text-primary-700 transition-transform duration-150 group-data-panel-open:rotate-180"
-              />
+            <CollapsibleTrigger className="w-full justify-start gap-1.5 bg-transparent hover:bg-primary-50 dark:hover:bg-primary-800/60 data-panel-open:bg-primary-50/60 px-2 py-1 rounded-md text-xs text-neutral-500 dark:text-neutral-400">
+              <span className="transition-transform duration-150 group-data-panel-open:rotate-90">▶</span>
+              <span className="font-mono">tool result</span>
+              {hasToolErrors && (
+                <span className="ml-1 text-red-400">⚠</span>
+              )}
             </CollapsibleTrigger>
             <CollapsiblePanel>
-              <div className="flex flex-col gap-3 border-l-2 border-primary-200 pl-2">
-                {toolParts.map((toolPart, index) => (
-                  <Tool
-                    key={toolPart.toolCallId || `${toolPart.type}-${index}`}
-                    toolPart={toolPart}
-                    defaultOpen={false}
-                  />
-                ))}
+              <div className="mt-1 flex flex-col gap-2">
+                {toolParts.map((toolPart, index) => {
+                  const resultText = typeof toolPart.output === 'string'
+                    ? toolPart.output
+                    : toolPart.output
+                      ? JSON.stringify(toolPart.output, null, 2)
+                      : ''
+                  return (
+                    <div key={toolPart.toolCallId || `${toolPart.type}-${index}`} className="flex flex-col gap-0.5">
+                      <span className="text-[10px] text-neutral-400 font-mono">{toolPart.type}</span>
+                      {resultText ? (
+                        <pre className="text-xs font-mono bg-neutral-900 dark:bg-neutral-950 text-neutral-200 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words max-h-48">
+                          {resultText}
+                        </pre>
+                      ) : (
+                        <span className="text-xs text-neutral-400 italic">no output</span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </CollapsiblePanel>
           </Collapsible>
@@ -743,6 +878,7 @@ function areMessagesEqual(
   }
   if (prevProps.wrapperClassName !== nextProps.wrapperClassName) return false
   if (prevProps.onRetryMessage !== nextProps.onRetryMessage) return false
+  if (prevProps.toolCalls !== nextProps.toolCalls) return false
   if (prevProps.wrapperDataMessageId !== nextProps.wrapperDataMessageId) {
     return false
   }

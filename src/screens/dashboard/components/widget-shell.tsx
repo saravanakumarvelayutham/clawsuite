@@ -90,10 +90,10 @@ export function WidgetShell({
           : undefined
       }
       className={cn(
-        // Base glass card
-        'group relative flex flex-col overflow-hidden rounded-2xl',
-        'border border-white/30 dark:border-white/10',
-        'bg-white/60 dark:bg-neutral-900/50 md:dark:bg-gray-900/60 backdrop-blur-md',
+        // Base glass card — C3: near-neutral dark, consistent card treatment
+        'group relative flex flex-col overflow-hidden rounded-xl',
+        'border border-primary-200 dark:border-neutral-800',
+        'bg-primary-50/95 dark:bg-[var(--theme-panel)] backdrop-blur-md',
         'shadow-sm transition-shadow',
         // Size
         SIZE_STYLES[size],
@@ -110,6 +110,10 @@ export function WidgetShell({
         className,
       )}
     >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent-500 via-accent-400/50 to-transparent"
+      />
       {/* Header */}
       <header
         className={cn(
@@ -123,12 +127,12 @@ export function WidgetShell({
               icon={icon}
               size={size === 'small' ? 13 : 15}
               strokeWidth={1.5}
-              className="shrink-0 text-primary-400"
+              className="shrink-0 text-neutral-600 dark:text-neutral-300"
             />
           ) : null}
           <h2
             className={cn(
-              'truncate font-medium uppercase tracking-wide text-primary-500',
+              'truncate font-semibold text-neutral-900 dark:text-neutral-100',
               TITLE_SIZE[size],
             )}
           >
@@ -187,14 +191,14 @@ function WidgetSkeleton({ size }: { size: WidgetSize }) {
     <div className="flex h-full flex-col gap-2 pt-1">
       <div
         className={cn(
-          'animate-shimmer rounded-lg bg-gray-200/65 dark:bg-gray-700/50',
+          'animate-shimmer rounded-lg bg-neutral-200/65 dark:bg-neutral-700/50',
           size === 'small' ? 'h-8' : 'h-10',
         )}
       />
       {size !== 'small' ? (
         <>
-          <div className="h-3 w-3/4 animate-shimmer rounded bg-gray-200/55 dark:bg-gray-700/45" />
-          <div className="h-3 w-1/2 animate-shimmer rounded bg-gray-200/45 dark:bg-gray-700/35" />
+          <div className="h-3 w-3/4 animate-shimmer rounded bg-neutral-200/55 dark:bg-neutral-700/45" />
+          <div className="h-3 w-1/2 animate-shimmer rounded bg-neutral-200/45 dark:bg-neutral-700/35" />
         </>
       ) : null}
     </div>
