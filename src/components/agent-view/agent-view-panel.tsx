@@ -1170,12 +1170,29 @@ export function AgentViewPanel() {
                                   <span className="shrink-0 text-[10px] text-primary-500 tabular-nums">
                                     {formatRuntimeLabel(agent.runtimeSeconds)}
                                   </span>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        await fetch(`/api/cli-agents/${agent.pid}/kill`, { method: 'POST' })
+                                        cliAgentsQuery.refetch()
+                                      } catch { /* noop */ }
+                                    }}
+                                    className="shrink-0 rounded px-1 py-0.5 text-[9px] text-primary-400 hover:bg-red-100 hover:text-red-500 transition-colors"
+                                    title="Kill agent"
+                                  >
+                                    ✕
+                                  </button>
                                 </div>
                                 {agent.task ? (
                                   <p className="mt-0.5 truncate pl-3 text-[10px] text-primary-500">
                                     {summarizeTask(agent.task)}
                                   </p>
-                                ) : null}
+                                ) : (
+                                  <p className="mt-0.5 pl-3 text-[10px] text-primary-400 italic">
+                                    {agent.runtimeSeconds > 7200 ? '⚠ stale — no task' : 'no task description'}
+                                  </p>
+                                )}
                                 <div className="mt-1 ml-3 h-1 overflow-hidden rounded-full bg-primary-200">
                                   <div
                                     className={cn(
