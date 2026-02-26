@@ -187,7 +187,7 @@ export function MobileTabBar() {
         // Vertical position: above home indicator
         'mb-[calc(env(safe-area-inset-bottom,16px)+8px)]',
         // Frosted glass pill
-        'bg-white dark:bg-neutral-900 backdrop-blur-2xl',
+        'bg-white/75 dark:bg-neutral-900/75 backdrop-blur-2xl',
         'rounded-full',
         'border border-white/40 dark:border-white/10',
         'shadow-[0_8px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]',
@@ -230,6 +230,7 @@ export function MobileTabBar() {
                 'size-10 rounded-full',
                 'transition-all duration-200 active:scale-90',
                 'select-none touch-manipulation',
+                'outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0',
               )}
               data-tab-idx={idx}
             >
@@ -253,13 +254,6 @@ export function MobileTabBar() {
         })}
       </div>
     </nav>
-    {/* Solid fill behind home indicator — prevents gray gap below pill */}
-    {!isChatRoute && (
-      <div
-        className="fixed bottom-0 left-0 right-0 md:hidden bg-white dark:bg-neutral-900"
-        style={{ height: 'env(safe-area-inset-bottom, 16px)', zIndex: 39 }}
-      />
-    )}
   </>
   )
 }
