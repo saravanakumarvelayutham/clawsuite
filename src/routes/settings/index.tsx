@@ -994,8 +994,10 @@ function ProfileSection() {
 function ChatDisplaySection() {
   const { settings: chatSettings, updateSettings: updateChatSettings } =
     useChatSettingsStore()
+  const { settings, updateSettings } = useSettings()
 
   return (
+    <>
     <SettingsSection
       title="Chat Display"
       description="Control what's visible in chat messages."
@@ -1026,6 +1028,26 @@ function ChatDisplaySection() {
         />
       </SettingsRow>
     </SettingsSection>
+    <SettingsSection
+      title="Mobile Navigation"
+      description="How the bottom nav bar behaves on chat screens."
+      icon={MessageMultiple01Icon}
+    >
+      <SettingsRow
+        label="Chat nav mode"
+        description="Dock: hides nav in chat (iMessage). Scroll-hide: nav stays, composer floats above."
+      >
+        <select
+          value={settings.mobileChatNavMode ?? 'dock'}
+          onChange={(e) => updateSettings({ mobileChatNavMode: e.target.value as 'dock' | 'integrated' | 'scroll-hide' })}
+          className="rounded-lg border border-primary-200 bg-white px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+        >
+          <option value="dock">Dock (iMessage)</option>
+          <option value="scroll-hide">Nav visible (pill above)</option>
+        </select>
+      </SettingsRow>
+    </SettingsSection>
+    </>
   )
 }
 

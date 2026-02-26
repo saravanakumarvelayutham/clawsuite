@@ -191,7 +191,7 @@ export function MobileTabBar() {
         // Pill: fixed bottom center, shrink to content width
         'fixed bottom-0 left-0 right-0 mx-auto w-fit z-40 md:hidden',
         // Vertical position: above home indicator
-        'mb-[calc(env(safe-area-inset-bottom,16px)+8px)]',
+        'mb-[calc(env(safe-area-inset-bottom,20px)+12px)]',
         // Frosted glass pill
         'bg-white/75 dark:bg-neutral-900/75 backdrop-blur-2xl',
         'rounded-full',
