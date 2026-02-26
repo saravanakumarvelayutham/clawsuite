@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import {
@@ -9,6 +9,7 @@ import {
 import { toggleAgentPause } from '@/lib/gateway-api'
 import { toast } from '@/components/ui/toast'
 import { AgentHubLayout } from './agent-hub-layout'
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 
 type AgentGatewayEntry = {
   id?: string
@@ -468,6 +469,27 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
   >({})
   const [historyAgentId, setHistoryAgentId] = useState<string | null>(null)
 
+  // Mobile detection for pull-to-refresh
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
+  )
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const update = () => setIsMobile(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  // Pull-to-refresh: attach to the scrollable <main> in workspace-shell
+  const scrollContainerRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    const el = document.querySelector('main[data-tour="chat-area"]') as HTMLElement | null
+    scrollContainerRef.current = el
+  }, [])
+
+  // handlePullRefresh defined after queries (see below)
+
   const agentsQuery = useQuery({
     queryKey: ['gateway', 'agents'],
     queryFn: async () => {
@@ -492,6 +514,17 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
     refetchInterval: 10_000,
     retry: false,
   })
+
+  const handlePullRefresh = useCallback(() => {
+    void agentsQuery.refetch()
+    void sessionsQuery.refetch()
+  }, [agentsQuery, sessionsQuery])
+
+  const { isPulling: agentHubPulling, pullDistance: agentHubPullDistance, threshold: agentHubThreshold } = usePullToRefresh(
+    isMobile,
+    handlePullRefresh,
+    scrollContainerRef,
+  )
 
   useEffect(() => {
     if (!sessionsQuery.isSuccess) return
@@ -814,9 +847,33 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
     ? new Date(agentsQuery.dataUpdatedAt).toLocaleTimeString()
     : null
 
+  const agentHubPullIndicatorStyle = agentHubPulling
+    ? { transform: `translateY(${Math.min(agentHubPullDistance - 8, 48)}px)`, opacity: Math.min(agentHubPullDistance / agentHubThreshold, 1) }
+    : undefined
+
   if (missionControlEnabled) {
     return (
-      <div className="flex h-full min-h-0 flex-col overflow-x-hidden">
+      <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden">
+        {/* Pull-to-refresh indicator (mobile) */}
+        {isMobile && agentHubPulling ? (
+          <div
+            className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2 transition-all duration-150"
+            style={agentHubPullIndicatorStyle}
+            aria-hidden
+          >
+            <div className="flex items-center gap-1.5 rounded-full border border-primary-200 bg-white/90 px-3 py-1.5 shadow-md backdrop-blur-sm dark:border-neutral-700 dark:bg-neutral-900/90">
+              <span
+                className={[
+                  'size-3 rounded-full border-2 border-accent-500',
+                  agentHubPullDistance >= agentHubThreshold ? 'border-t-transparent animate-spin' : 'opacity-50',
+                ].join(' ')}
+              />
+              <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">
+                {agentHubPullDistance >= agentHubThreshold ? 'Release to refresh' : 'Pull to refresh'}
+              </span>
+            </div>
+          </div>
+        ) : null}
         {usingFallbackRegistry ? (
           <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
             Gateway registry unavailable. Showing fallback definitions.

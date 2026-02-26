@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ import {
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 
 type SkillsTab = 'installed' | 'marketplace' | 'featured'
 type SkillsSort = 'name' | 'category'
@@ -135,6 +136,18 @@ export function SkillsScreen() {
   const [selectedSkill, setSelectedSkill] = useState<SkillSummary | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
+  // Mobile detection for pull-to-refresh
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
+  )
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const update = () => setIsMobile(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
   const skillsQuery = useQuery({
     queryKey: ['skills-browser', tab, searchInput, category, page, sort],
     queryFn: async function fetchSkills(): Promise<SkillsApiResponse> {
@@ -156,6 +169,23 @@ export function SkillsScreen() {
       return payload
     },
   })
+
+  // Pull-to-refresh: attach to the scrollable parent (<main> in workspace-shell)
+  const scrollContainerRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    const el = document.querySelector('main[data-tour="chat-area"]') as HTMLElement | null
+    scrollContainerRef.current = el
+  }, [])
+
+  const handleRefresh = useCallback(() => {
+    void skillsQuery.refetch()
+  }, [skillsQuery])
+
+  const { isPulling, pullDistance, threshold } = usePullToRefresh(
+    isMobile,
+    handleRefresh,
+    scrollContainerRef,
+  )
 
   const categories = useMemo(
     function resolveCategories() {
@@ -303,8 +333,32 @@ export function SkillsScreen() {
     )
   }
 
+  const pullIndicatorStyle = isPulling
+    ? { transform: `translateY(${Math.min(pullDistance - 8, 48)}px)`, opacity: Math.min(pullDistance / threshold, 1) }
+    : undefined
+
   return (
-    <div className="min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
+    <div className="relative min-h-full bg-surface px-4 pt-5 pb-24 md:px-6 md:pt-8 text-primary-900 dark:text-neutral-100">
+      {/* Pull-to-refresh indicator (mobile) */}
+      {isMobile && isPulling ? (
+        <div
+          className="pointer-events-none absolute left-1/2 top-2 z-50 -translate-x-1/2 transition-all duration-150"
+          style={pullIndicatorStyle}
+          aria-hidden
+        >
+          <div className="flex items-center gap-1.5 rounded-full border border-primary-200 bg-white/90 px-3 py-1.5 shadow-md backdrop-blur-sm dark:border-neutral-700 dark:bg-neutral-900/90">
+            <span
+              className={cn(
+                'size-3 rounded-full border-2 border-accent-500',
+                pullDistance >= threshold ? 'border-t-transparent animate-spin' : 'opacity-50',
+              )}
+            />
+            <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">
+              {pullDistance >= threshold ? 'Release to refresh' : 'Pull to refresh'}
+            </span>
+          </div>
+        </div>
+      ) : null}
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
         <header className="rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
           <div className="flex flex-col gap-0.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
