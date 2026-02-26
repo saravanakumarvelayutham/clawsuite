@@ -262,6 +262,7 @@ export function ChatScreen({
   const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
   const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
   const mobileKeyboardActive = mobileKeyboardInset > 0 || mobileComposerFocused
+  void mobileKeyboardActive // kept for future use
   const isAgentViewOpen = useAgentViewStore((state) => state.isOpen)
   const setAgentViewOpen = useAgentViewStore((state) => state.setOpen)
   const isTerminalPanelOpen = useTerminalPanelStore(
@@ -887,23 +888,19 @@ export function ChatScreen({
 
   const terminalPanelInset =
     !isMobile && isTerminalPanelOpen ? terminalPanelHeight : 0
+  // --chat-composer-height is the measured offsetHeight of the composer wrapper,
+  // which already includes its own paddingBottom (tab bar + safe area).
+  // So content just needs composer-height + a small breathing gap.
   const mobileScrollBottomOffset = useMemo(() => {
     if (!isMobile) return 0
-    if (mobileKeyboardActive) {
-      return 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
-    }
-    // At rest: composer sits above tab bar, so pad by composer + tab bar + safe area
-    return 'calc(var(--chat-composer-height, 96px) + var(--tabbar-h, 5rem) + env(safe-area-inset-bottom, 0px))'
-  }, [isMobile, mobileKeyboardActive])
+    return 'var(--chat-composer-height, 56px)'
+  }, [isMobile])
 
   // Keep message list clear of composer, keyboard, and desktop terminal panel.
   const stableContentStyle = useMemo<React.CSSProperties>(() => {
     if (isMobile) {
-      const mobileBase = mobileKeyboardActive
-        ? 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
-        : 'calc(var(--chat-composer-height, 96px) + var(--tabbar-h, 5rem) + env(safe-area-inset-bottom, 0px))'
       return {
-        paddingBottom: `calc(${mobileBase} + 16px)`,
+        paddingBottom: 'calc(var(--chat-composer-height, 56px) + 8px)',
       }
     }
     return {
@@ -912,7 +909,7 @@ export function ChatScreen({
           ? `${terminalPanelInset + 16}px`
           : '16px',
     }
-  }, [isMobile, mobileKeyboardActive, terminalPanelInset])
+  }, [isMobile, terminalPanelInset])
 
   const shouldRedirectToNew =
     !isNewChat &&

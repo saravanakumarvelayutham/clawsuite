@@ -1492,12 +1492,11 @@ function ChatComposerComponent({
         'no-swipe pointer-events-auto touch-manipulation',
         isMobileViewport
           ? [
-              // Fixed pill floating above nav bar — 16px side margins
-              'fixed left-4 right-4 bottom-0 z-[70] transition-transform duration-200',
-              // Frosted glass pill
-              'bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl',
-              'shadow-[0_8px_32px_rgba(0,0,0,0.15)]',
-              'rounded-[22px]',
+              // Fixed bottom composer — edge-to-edge when keyboard is up, pill when at rest
+              'fixed bottom-0 z-[70] transition-all duration-200',
+              keyboardOrFocusActive
+                ? 'left-0 right-0 bg-white dark:bg-neutral-900 border-t border-primary-200 dark:border-neutral-800'
+                : 'left-4 right-4 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.15)] rounded-[22px]',
             ].join(' ')
           : ['relative z-40 shrink-0 w-full mx-auto px-3 pt-2 sm:px-5', 'bg-surface'].join(' '),
         // Mobile: pin above tab bar + safe-area inset. Desktop: normal bottom padding.

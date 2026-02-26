@@ -145,7 +145,7 @@ function ChatContainerContent({
   ...props
 }: ChatContainerContentProps) {
   return (
-    <div className={cn('flex w-full flex-col', className)} {...props}>
+    <div className={cn('flex w-full flex-col min-h-full justify-end', className)} {...props}>
       <div
         className="mx-auto w-full px-3 sm:px-5 flex flex-col"
         style={{ maxWidth: 'min(768px, 100%)' }}
@@ -161,7 +161,7 @@ function ChatContainerScrollAnchor({
 }: ChatContainerScrollAnchorProps) {
   return (
     <div
-      className="h-px w-full shrink-0 scroll-mt-4 pt-8 pb-4"
+      className="h-px w-full shrink-0 scroll-mt-2 pt-2 pb-1 md:scroll-mt-4 md:pt-8 md:pb-4"
       style={{ overflowAnchor: 'auto' }}
       aria-hidden="true"
       {...props}
