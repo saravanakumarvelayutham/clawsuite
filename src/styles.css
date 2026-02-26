@@ -832,8 +832,40 @@ code {
   }
 }
 
+/* Slide-in from right (navigating to a lower tab index) */
+@keyframes slide-in-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Slide-in from left (navigating to a higher tab index) */
+@keyframes slide-in-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .page-transition {
   animation: page-fade-in 0.15s ease-out;
+}
+
+.page-transition.slide-enter-left {
+  animation: slide-in-from-left 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.page-transition.slide-enter-right {
+  animation: slide-in-from-right 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 /* Chat panel: force all content to respect panel width */

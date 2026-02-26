@@ -11,7 +11,7 @@
  * Chat routes get the full ChatScreen treatment.
  * Non-chat routes show the sub-page content.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
@@ -65,6 +65,19 @@ export function WorkspaceShell() {
     if (typeof window === 'undefined') return false
     return window.matchMedia('(max-width: 767px)').matches
   })
+
+  // Slide transition direction tracking (mobile only)
+  const [slideClass, setSlideClass] = useState<string>('')
+  const prevTabIndexRef = useRef<number>(-1)
+
+  // Map pathname to tab index (mirrors TABS order in mobile-tab-bar)
+  const getTabIndex = useCallback((path: string): number => {
+    if (path.startsWith('/dashboard')) return 0
+    if (path.startsWith('/agent-swarm') || path.startsWith('/agents')) return 1
+    if (path.startsWith('/chat') || path === '/new' || path === '/') return 2
+    if (path.startsWith('/settings')) return 3
+    return -1
+  }, [])
 
   // Fetch actual auth status from server instead of hardcoding
   interface AuthStatus {
@@ -151,6 +164,26 @@ export function WorkspaceShell() {
     setSidebarCollapsed(true)
   }, [isMobile, pathname, setSidebarCollapsed])
 
+  // Slide transitions on mobile tab navigation
+  useEffect(() => {
+    if (!isMobile) return
+    const currentIdx = getTabIndex(pathname)
+    const prevIdx = prevTabIndexRef.current
+
+    if (prevIdx !== -1 && currentIdx !== -1 && currentIdx !== prevIdx) {
+      // Navigate right (higher index) = slide left; left = slide right
+      const direction = currentIdx > prevIdx ? 'slide-enter-left' : 'slide-enter-right'
+      setSlideClass(direction)
+      // Remove class after animation completes
+      const timer = setTimeout(() => setSlideClass(''), 250)
+      prevTabIndexRef.current = currentIdx
+      return () => clearTimeout(timer)
+    }
+
+    prevTabIndexRef.current = currentIdx
+    return undefined
+  }, [isMobile, pathname, getTabIndex])
+
   // Listen for global sidebar toggle shortcut
   useEffect(() => {
     function handleToggleEvent() {
@@ -226,7 +259,7 @@ export function WorkspaceShell() {
             ].join(' ')}
             data-tour="chat-area"
           >
-            <div className="page-transition h-full">
+            <div className={['page-transition h-full', slideClass].filter(Boolean).join(' ')}>
               <ErrorBoundary
                 className="h-full"
                 title="Something went wrong"
