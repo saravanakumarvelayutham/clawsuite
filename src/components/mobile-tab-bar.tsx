@@ -140,8 +140,10 @@ export function MobileTabBar() {
       if (!el) return
       const rect = el.getBoundingClientRect()
       if (rect.height <= 0) return
-      // pill height + 16px above safe area + safe area itself — use 80px as total scroll clearance
-      const total = Math.ceil(rect.height) + 24
+      // pill height + its bottom margin (safe-area + 8px) + 12px breathing room
+      const safeArea = window.innerHeight - document.documentElement.clientHeight || 0
+      const bottomInset = Math.max(safeArea, 16) + 8
+      const total = Math.ceil(rect.height) + bottomInset + 12
       root.style.setProperty('--tabbar-h', `${total}px`)
     }
 
@@ -167,13 +169,16 @@ export function MobileTabBar() {
       if (el) {
         const rect = el.getBoundingClientRect()
         if (rect.height > 0) {
-          root.style.setProperty('--tabbar-h', `${Math.ceil(rect.height) + 24}px`)
+          const safeArea2 = window.innerHeight - document.documentElement.clientHeight || 0
+          const bInset = Math.max(safeArea2, 16) + 8
+          root.style.setProperty('--tabbar-h', `${Math.ceil(rect.height) + bInset + 12}px`)
         }
       }
     }
   }, [isChatRoute])
 
   return (
+    <>
     <nav
       ref={navRef}
       className={cn(
@@ -182,7 +187,7 @@ export function MobileTabBar() {
         // Vertical position: above home indicator
         'mb-[calc(env(safe-area-inset-bottom,16px)+8px)]',
         // Frosted glass pill
-        'bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl',
+        'bg-white dark:bg-neutral-900 backdrop-blur-2xl',
         'rounded-full',
         'border border-white/40 dark:border-white/10',
         'shadow-[0_8px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]',
@@ -248,5 +253,13 @@ export function MobileTabBar() {
         })}
       </div>
     </nav>
+    {/* Solid fill behind home indicator — prevents gray gap below pill */}
+    {!isChatRoute && (
+      <div
+        className="fixed bottom-0 left-0 right-0 md:hidden bg-white dark:bg-neutral-900"
+        style={{ height: 'env(safe-area-inset-bottom, 16px)', zIndex: 39 }}
+      />
+    )}
+  </>
   )
 }
