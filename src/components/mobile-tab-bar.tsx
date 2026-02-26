@@ -74,8 +74,6 @@ const TABS: TabItem[] = [
 export function MobileTabBar() {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
-  const mobileComposerFocused = useWorkspaceStore((s) => s.mobileComposerFocused)
   const setMobileKeyboardOpen = useWorkspaceStore((s) => s.setMobileKeyboardOpen)
   const setMobileKeyboardInset = useWorkspaceStore((s) => s.setMobileKeyboardInset)
   const setMobileComposerFocused = useWorkspaceStore(
@@ -86,9 +84,7 @@ export function MobileTabBar() {
   const isChatRoute =
     pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
 
-  // Hide tab bar when keyboard is open OR composer is focused (iOS reports focus before viewport resize)
-  const keyboardActive = mobileKeyboardInset > 0 || mobileComposerFocused
-  const hideTabBar = isChatRoute && keyboardActive
+  const hideTabBar = isChatRoute  // always hide tab bar in chat — composer handles navigation
 
   const revealTabBar = useCallback(() => {
     const activeElement = document.activeElement

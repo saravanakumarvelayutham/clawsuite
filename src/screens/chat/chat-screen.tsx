@@ -72,7 +72,7 @@ import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
-import { MOBILE_TAB_BAR_OFFSET } from '@/components/mobile-tab-bar'
+// MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 
 type ChatScreenProps = {
@@ -877,7 +877,8 @@ export function ChatScreen({
     if (mobileKeyboardActive) {
       return 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
     }
-    return `calc(var(--chat-composer-height, 96px) + ${MOBILE_TAB_BAR_OFFSET})`
+    // Tab bar is hidden in chat, so only account for composer height + safe area
+    return 'calc(var(--chat-composer-height, 96px) + env(safe-area-inset-bottom, 0px))'
   }, [isMobile, mobileKeyboardActive])
 
   // Keep message list clear of composer, keyboard, and desktop terminal panel.
@@ -885,9 +886,9 @@ export function ChatScreen({
     if (isMobile) {
       const mobileBase = mobileKeyboardActive
         ? 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
-        : `calc(var(--chat-composer-height, 96px) + ${MOBILE_TAB_BAR_OFFSET})`
+        : 'calc(var(--chat-composer-height, 96px) + env(safe-area-inset-bottom, 0px))'
       return {
-        paddingBottom: `calc(${mobileBase} + var(--safe-b) + 16px)`,
+        paddingBottom: `calc(${mobileBase} + 24px)`,
       }
     }
     return {
