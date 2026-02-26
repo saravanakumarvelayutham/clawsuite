@@ -143,7 +143,7 @@ export function MobileTabBar() {
         )}
         aria-label="Mobile navigation"
       >
-        <div className="mx-2 mb-0 grid grid-cols-5 gap-1 rounded-2xl border border-white/30 dark:border-white/10 px-1 py-1.5 shadow-[0_4px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
+        <div className="grid grid-cols-5 gap-1 px-2 py-1.5">
           {TABS.map((tab) => {
             const isActive = tab.match(pathname)
             const isCenterChat = tab.id === 'chat'
