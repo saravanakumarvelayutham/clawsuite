@@ -4,6 +4,7 @@ import {
   BotIcon,
   Chat01Icon,
   Home01Icon,
+  PuzzleIcon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -51,6 +52,13 @@ const TABS: TabItem[] = [
     icon: Chat01Icon,
     to: '/chat/main',
     match: (p) => p.startsWith('/chat') || p === '/new' || p === '/',
+  },
+  {
+    id: 'skills',
+    label: 'Skills',
+    icon: PuzzleIcon,
+    to: '/skills',
+    match: (p) => p.startsWith('/skills'),
   },
   {
     id: 'settings',
@@ -195,7 +203,7 @@ export function MobileTabBar() {
         {TABS.map((tab, idx) => {
           const isActive = tab.match(pathname)
           const isCenter = tab.id === 'chat'
-          const circleSize = isCenter && isActive ? 'size-11' : isActive ? 'size-10' : 'size-11'
+          const circleSize = isCenter && isActive ? 'size-10' : isActive ? 'size-9' : 'size-10'
 
           return (
             <button
@@ -211,9 +219,9 @@ export function MobileTabBar() {
               aria-current={isActive ? 'page' : undefined}
               aria-label={tab.label}
               className={cn(
-                // 44x44 touch target, icon centered
+                // 40x40 touch target (slightly smaller to fit 5 tabs)
                 'flex items-center justify-center',
-                'size-11 rounded-full',
+                'size-10 rounded-full',
                 'transition-all duration-200 active:scale-90',
                 'select-none touch-manipulation',
               )}
@@ -230,7 +238,7 @@ export function MobileTabBar() {
               >
                 <HugeiconsIcon
                   icon={tab.icon}
-                  size={isCenter ? 22 : 20}
+                  size={isCenter ? 20 : 18}
                   strokeWidth={isActive ? 2 : 1.6}
                 />
               </span>

@@ -75,7 +75,8 @@ export function WorkspaceShell() {
     if (path.startsWith('/dashboard')) return 0
     if (path.startsWith('/agent-swarm') || path.startsWith('/agents')) return 1
     if (path.startsWith('/chat') || path === '/new' || path === '/') return 2
-    if (path.startsWith('/settings')) return 3
+    if (path.startsWith('/skills')) return 3
+    if (path.startsWith('/settings')) return 4
     return -1
   }, [])
 
