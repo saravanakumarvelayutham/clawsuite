@@ -6795,7 +6795,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       {/* ── Main content ──────────────────────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* ── Tab content area ── */}
-        <div className="min-w-0 flex-1 overflow-hidden">
+        <div className="min-w-0 flex-1 overflow-hidden pb-[calc(var(--tabbar-h,80px)+1rem)] md:pb-0">
           {activeTab === 'overview' && (
             <div className="h-full min-h-0">
               {renderOverviewContent()}
@@ -7584,46 +7584,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
       ) : null}
 
-      {/* ── Mobile: Bottom Tab Nav ─────────────────────────────────────────── */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-200 bg-white/95 backdrop-blur-sm md:hidden"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
-        <div className="flex">
-          {TAB_DEFS.map((tab) => {
-            const pendingApprovals = tab.id === 'configure'
-              ? approvals.filter(a => a.status === 'pending').length
-              : 0
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'relative flex flex-1 flex-col items-center justify-center py-2.5 text-[10px] font-medium transition-colors',
-                  activeTab === tab.id
-                    ? 'text-orange-600'
-                    : 'text-neutral-500 hover:text-neutral-800',
-                )}
-              >
-                <span className="text-base leading-none" aria-hidden>{tab.icon}</span>
-                <span className="mt-0.5">{tab.label}</span>
-                {tab.id === 'missions' && isMissionRunning ? (
-                  <span className="absolute right-3 top-1.5 flex size-1.5">
-                    <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
-                    <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-                  </span>
-                ) : null}
-                {tab.id === 'configure' && pendingApprovals > 0 ? (
-                  <span className="absolute right-2 top-1 rounded-full bg-orange-500 px-1 text-[8px] font-bold text-white leading-tight">
-                    {pendingApprovals > 9 ? '9+' : pendingApprovals}
-                  </span>
-                ) : null}
-              </button>
-            )
-          })}
-        </div>
-      </div>
     </div>
     {/* ── Mission Completion Report Modal ─────────────────────────────── */}
     {completionReportVisible && completionReport ? (
