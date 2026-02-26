@@ -1458,6 +1458,13 @@ export function ChatScreen({
     [queryClient],
   )
 
+  const scrollChatToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const viewport = document.querySelector('[data-chat-scroll-viewport]') as HTMLElement | null
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior })
+    }
+  }, [])
+
   const send = useCallback(
     (
       body: string,
@@ -1477,6 +1484,9 @@ export function ChatScreen({
       lastSendAtRef.current = now
 
       helpers.reset()
+
+      // Scroll to bottom immediately so user sees their message + incoming response
+      requestAnimationFrame(() => scrollChatToBottom('smooth'))
 
       const attachmentPayload: Array<GatewayAttachment> = attachments.map(
         (attachment) => ({
@@ -1543,6 +1553,7 @@ export function ChatScreen({
       isNewChat,
       navigate,
       onSessionResolved,
+      scrollChatToBottom,
       upsertSessionInCache,
       queryClient,
       resolvedSessionKey,
