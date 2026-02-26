@@ -1466,18 +1466,28 @@ function ChatComposerComponent({
   const composerWrapperStyle = useMemo(
     () => {
       if (!isMobileViewport) return { maxWidth: 'min(768px, 100%)' } as CSSProperties
-      // fixed bottom-0 composer — use paddingBottom to clear tab bar or keyboard
-      // never use translateY to lift, only to hide (scroll-hidden)
-      const kbInset = 'var(--kb-inset, 0px)'
-      const tabBarH = 'var(--tabbar-h, 5rem)'
+      // iMessage/Telegram model: composer always docks to bottom.
+      // Tab bar is hidden on chat routes so no need to pad above it.
       const safeArea = 'env(safe-area-inset-bottom, 0px)'
-      const pb = keyboardOrFocusActive
-        ? `calc(${kbInset} + max(var(--safe-b, 0px), ${safeArea}))`
-        : `calc(${tabBarH} + max(var(--safe-b, 0px), ${safeArea}))`
       const tf = effectiveScrollHidden ? 'translateY(110%)' : 'translateY(0)'
+
+      if (keyboardOrFocusActive) {
+        // Keyboard up: flush at bottom, pad for keyboard inset
+        return {
+          maxWidth: 'min(768px, 100%)',
+          bottom: '0px',
+          paddingBottom: `calc(var(--kb-inset, 0px))`,
+          transform: tf,
+          WebkitTransform: tf,
+          '--mobile-tab-bar-offset': MOBILE_TAB_BAR_OFFSET,
+        } as CSSProperties
+      }
+
+      // At rest: sit at bottom, pad only for safe area (home indicator)
       return {
         maxWidth: 'min(768px, 100%)',
-        paddingBottom: pb,
+        bottom: '0px',
+        paddingBottom: `max(var(--safe-b, 0px), ${safeArea})`,
         transform: tf,
         WebkitTransform: tf,
         '--mobile-tab-bar-offset': MOBILE_TAB_BAR_OFFSET,
@@ -1492,11 +1502,10 @@ function ChatComposerComponent({
         'no-swipe pointer-events-auto touch-manipulation',
         isMobileViewport
           ? [
-              // Fixed bottom composer — edge-to-edge when keyboard is up, pill when at rest
-              'fixed bottom-0 z-[70] transition-all duration-200',
-              keyboardOrFocusActive
-                ? 'left-0 right-0 bg-white dark:bg-neutral-900 border-t border-primary-200 dark:border-neutral-800'
-                : 'left-4 right-4 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.15)] rounded-[22px]',
+              // iMessage-style: always edge-to-edge, docked to bottom
+              'fixed left-0 right-0 z-[70] transition-transform duration-200',
+              'bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl',
+              'border-t border-primary-200/60 dark:border-neutral-800',
             ].join(' ')
           : ['relative z-40 shrink-0 w-full mx-auto px-3 pt-2 sm:px-5', 'bg-surface'].join(' '),
         // Mobile: pin above tab bar + safe-area inset. Desktop: normal bottom padding.

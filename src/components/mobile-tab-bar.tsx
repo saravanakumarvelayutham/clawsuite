@@ -79,9 +79,9 @@ export function MobileTabBar() {
   const dragStartTimeRef = useRef<number | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  // isChatRoute = inside a specific conversation (not /chat/main)
+  // isChatRoute = any chat screen (hide tab bar on all chat views)
   const isChatRoute =
-    pathname.startsWith('/chat/') && pathname !== '/chat/main'
+    pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
 
   // Drag-to-switch: horizontal swipe across pill switches tabs
   const handlePillTouchStart = useCallback(
