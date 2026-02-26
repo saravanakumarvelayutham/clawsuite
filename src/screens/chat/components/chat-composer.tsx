@@ -1465,10 +1465,19 @@ function ChatComposerComponent({
   return (
     <div
       className={cn(
-        'no-swipe pointer-events-auto mx-auto w-full bg-surface px-3 pt-2 sm:px-5 touch-manipulation',
+        'no-swipe pointer-events-auto mx-auto w-full px-3 pt-2 sm:px-5 touch-manipulation',
         isMobileViewport
-          ? 'fixed inset-x-0 bottom-0 z-[70] transition-transform duration-200'
-          : 'relative z-40 shrink-0',
+          ? [
+              // Fixed position: left-3/right-3 instead of inset-x-0 so composer floats with margin
+              'fixed left-3 right-3 bottom-0 z-[70] transition-transform duration-200',
+              // Frosted glass background on mobile
+              'bg-white/90 dark:bg-neutral-900/90 backdrop-blur-xl',
+              // Floating shadow
+              'shadow-[0_4px_24px_rgba(0,0,0,0.12)]',
+              // Pill shape
+              'rounded-3xl',
+            ].join(' ')
+          : ['relative z-40 shrink-0', 'bg-surface'].join(' '),
         // Mobile: pin above tab bar + safe-area inset. Desktop: normal bottom padding.
         !isMobileViewport
           ? 'pb-[max(var(--safe-b),0px)] md:pb-[calc(var(--safe-b)+0.75rem)]'
