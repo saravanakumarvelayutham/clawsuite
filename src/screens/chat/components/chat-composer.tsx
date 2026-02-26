@@ -1441,16 +1441,17 @@ function ChatComposerComponent({
 
   const composerWrapperStyle = useMemo(
     () => {
-      // Tab bar is always hidden in chat — composer sits just above safe area.
+      // Composer sits above tab bar (--tabbar-h) + safe area at rest.
+      // When keyboard active, tab bar hides itself so only lift by kb inset.
+      const tabBarH = 'var(--tabbar-h, 3.75rem)'
       const safeAreaInset = 'env(safe-area-inset-bottom, 0px)'
       const kbInset = 'var(--kb-inset, 0px)'
-      // When scroll-hidden on mobile, push the composer below the viewport
       const hiddenOffset = effectiveScrollHidden ? '110%' : '0px'
       const mobileTranslate = effectiveScrollHidden
         ? `translateY(${hiddenOffset})`
         : keyboardOrFocusActive
-          ? `translateY(calc(-1 * (${kbInset})))`
-          : `translateY(calc(-1 * ${safeAreaInset}))`
+          ? `translateY(calc(-1 * ${kbInset}))`
+          : `translateY(calc(-1 * (${tabBarH} + ${safeAreaInset})))`
       return {
         maxWidth: 'min(768px, 100%)',
         '--mobile-tab-bar-offset': MOBILE_TAB_BAR_OFFSET,

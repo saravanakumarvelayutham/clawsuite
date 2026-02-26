@@ -603,7 +603,21 @@ export function ChatScreen({
       return nextMessages
     }
 
-    nextMessages.push(streamingMsg)
+    // Insert streaming message after the last user message to prevent
+    // user messages appearing after the assistant response (race condition)
+    const lastUserIdx = nextMessages.reduce(
+      (lastIdx, msg, idx) => (msg.role === 'user' ? idx : lastIdx),
+      -1,
+    )
+    if (lastUserIdx >= 0 && lastUserIdx === nextMessages.length - 1) {
+      // User message is last — append streaming after it (normal case)
+      nextMessages.push(streamingMsg)
+    } else if (lastUserIdx >= 0) {
+      // User message is NOT last — insert streaming right after it
+      nextMessages.splice(lastUserIdx + 1, 0, streamingMsg)
+    } else {
+      nextMessages.push(streamingMsg)
+    }
     return nextMessages
   }, [
     activeToolCalls,
@@ -877,8 +891,8 @@ export function ChatScreen({
     if (mobileKeyboardActive) {
       return 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
     }
-    // Tab bar is hidden in chat, so only account for composer height + safe area
-    return 'calc(var(--chat-composer-height, 96px) + env(safe-area-inset-bottom, 0px))'
+    // At rest: composer sits above tab bar, so pad by composer + tab bar + safe area
+    return 'calc(var(--chat-composer-height, 96px) + var(--tabbar-h, 3.75rem) + env(safe-area-inset-bottom, 0px))'
   }, [isMobile, mobileKeyboardActive])
 
   // Keep message list clear of composer, keyboard, and desktop terminal panel.
@@ -886,9 +900,9 @@ export function ChatScreen({
     if (isMobile) {
       const mobileBase = mobileKeyboardActive
         ? 'calc(var(--chat-composer-height, 96px) + var(--kb-inset, 0px))'
-        : 'calc(var(--chat-composer-height, 96px) + env(safe-area-inset-bottom, 0px))'
+        : 'calc(var(--chat-composer-height, 96px) + var(--tabbar-h, 3.75rem) + env(safe-area-inset-bottom, 0px))'
       return {
-        paddingBottom: `calc(${mobileBase} + 24px)`,
+        paddingBottom: `calc(${mobileBase} + 16px)`,
       }
     }
     return {

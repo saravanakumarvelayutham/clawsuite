@@ -81,10 +81,7 @@ export function MobileTabBar() {
   )
   const navRef = useRef<HTMLElement>(null)
   const indicatorTouchStartYRef = useRef<number | null>(null)
-  const isChatRoute =
-    pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
-
-  const hideTabBar = isChatRoute  // always hide tab bar in chat — composer handles navigation
+  const hideTabBar = false  // tab bar always visible — composer sits above it
 
   const revealTabBar = useCallback(() => {
     const activeElement = document.activeElement
