@@ -4958,7 +4958,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       .slice(0, 3)
 
     // Shared card style
-    const cardCls = 'relative overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-slate-700 dark:bg-[var(--theme-card,#161b27)] p-4 shadow-sm'
+    const cardCls = 'relative overflow-hidden rounded-xl border border-primary-200 bg-white dark:border-neutral-800 dark:bg-neutral-800 px-4 py-3 shadow-sm'
     const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50'
 
     return (
@@ -4992,7 +4992,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
           {/* ── Quick Launch Bar ── */}
           {!missionActive && (
-            <div className="relative mx-auto mt-6 w-full max-w-[1600px] shrink-0 px-3 sm:px-4">
+            <div className="relative mx-auto mt-3 w-full max-w-[1600px] shrink-0 px-3 sm:mt-6 sm:px-4">
               <div className="flex items-center gap-3 rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-[var(--theme-card,#161b27)] p-3 shadow-sm">
                 <span className="text-xl">🚀</span>
                 <input
@@ -5010,7 +5010,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <button
                   type="button"
                   onClick={() => openNewMissionModal(missionGoal.trim() ? { goal: missionGoal.trim() } : undefined)}
-                  className="shrink-0 rounded-lg bg-accent-500 px-4 py-2 text-xs font-semibold text-white hover:bg-accent-600 transition-colors"
+                  className="shrink-0 rounded-lg bg-accent-500 text-white px-4 py-2 text-sm font-semibold hover:bg-accent-600 transition-colors"
                 >
                   Launch
                 </button>
@@ -5024,17 +5024,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           )}
 
           {/* ── 3-card row — shrink-0, anchored at bottom ── */}
-          <section className="relative mx-auto mb-4 mt-4 w-full max-w-[1600px] shrink-0 grid grid-cols-1 gap-4 px-3 sm:grid-cols-2 sm:px-4 xl:grid-cols-3">
+          <section className="relative mx-auto mb-4 mt-3 w-full max-w-[1600px] shrink-0 grid grid-cols-1 gap-3 px-3 sm:grid-cols-2 sm:gap-4 sm:px-4 xl:grid-cols-3">
 
             {/* ─── Card 1: Active Team ─────────────────────────────────── */}
             <article className={cardCls}>
               <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Active Team</h2>
+                <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400">Active Team</h2>
                 <button
                   type="button"
                   onClick={() => { setActiveTab('configure'); setConfigSection('teams') }}
-                  className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400 hover:border-neutral-300 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
+                  className="rounded-lg border border-primary-200 bg-white text-primary-700 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                 >
                   Switch Team
                 </button>
@@ -5047,7 +5047,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <button
                     type="button"
                     onClick={() => { setActiveTab('configure'); setConfigSection('teams') }}
-                    className="mt-1 rounded-lg bg-orange-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-orange-600 transition-colors"
+                    className="mt-1 rounded-lg bg-accent-500 text-white px-4 py-2 text-sm font-semibold hover:bg-accent-600 transition-colors"
                   >
                     + Create Team
                   </button>
@@ -5103,11 +5103,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <article className={cardCls}>
               <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Recent Missions</h2>
+                <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400">Recent Missions</h2>
                 <button
                   type="button"
                   onClick={() => setActiveTab('missions')}
-                  className="text-[10px] font-medium text-orange-500 hover:text-orange-600 transition-colors"
+                  className="rounded-lg border border-primary-200 bg-white text-primary-700 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                 >
                   View All →
                 </button>
@@ -5141,7 +5141,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <button
                     type="button"
                     onClick={() => openNewMissionModal()}
-                    className="mt-1 rounded-lg bg-orange-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-orange-600 transition-colors"
+                    className="mt-1 rounded-lg bg-accent-500 text-white px-4 py-2 text-sm font-semibold hover:bg-accent-600 transition-colors"
                   >
                     + New Mission
                   </button>
@@ -5185,7 +5185,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <article className={cardCls}>
               <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Usage &amp; Cost</h2>
+                <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400">Usage &amp; Cost</h2>
                 <span className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
                   Today
                 </span>
@@ -6148,11 +6148,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       failed: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', label: 'Failed' },
     }
 
-	    const missionCardCls = 'relative overflow-hidden rounded-xl border border-primary-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900 p-4'
+	    const missionCardCls = 'relative overflow-hidden rounded-xl border border-primary-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-800 px-4 py-3'
 	    return (
 	      <div className="relative flex h-full min-h-0 flex-col bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)]">
 	        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
-	        <div className="relative mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col gap-4 p-3 pb-24 sm:p-4 sm:pb-4">
+	        <div className="relative mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col gap-3 p-3 pb-24 sm:gap-4 sm:p-4 sm:pb-4">
 	          {/* ── Header ──────────────────────────────────────────────────── */}
           <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
             <div>
@@ -6163,7 +6163,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <button
                 type="button"
                 onClick={() => openNewMissionModal()}
-                className="min-h-11 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-white hover:bg-accent-600"
+                className="rounded-lg bg-accent-500 text-white px-4 py-2 text-sm font-semibold hover:bg-accent-600 transition-colors"
               >
                 + New Mission
               </button>
@@ -6196,10 +6196,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   type="button"
                   onClick={() => setMissionSubTab(tab.id)}
                   className={cn(
-                    'flex items-center gap-1.5 transition-colors',
+                    'flex items-center gap-1 transition-colors',
                     isActive
-                      ? 'flex-1 rounded-lg bg-white dark:bg-neutral-800 py-2 text-center text-sm font-semibold text-accent-600 dark:text-accent-400 shadow-sm'
-                      : 'flex-1 rounded-lg py-2 text-center text-sm font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300',
+                      ? 'flex-1 rounded-lg bg-white dark:bg-neutral-800 py-1.5 text-center text-sm font-semibold text-accent-600 dark:text-accent-400 shadow-sm sm:py-2'
+                      : 'flex-1 rounded-lg py-1.5 text-center text-sm font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300 sm:py-2',
                   )}
                 >
                   <span className="mx-auto flex items-center gap-1.5">
@@ -6338,7 +6338,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                 setOutputPanelVisible(true)
                                 if (!selectedOutputAgentId && team.length > 0) setSelectedOutputAgentId(team[0].id)
                               }}
-                              className="rounded-md border border-blue-200 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                              className="rounded-lg border border-primary-200 bg-white text-primary-700 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                             >
                               Live Output ↗
                             </button>
@@ -6346,7 +6346,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setSelectedReport(entry.report!) }}
-                              className="rounded-md border border-accent-200 dark:border-accent-800/50 bg-accent-50 dark:bg-accent-900/20 px-2 py-1 text-[11px] font-medium text-accent-700 dark:text-accent-400 hover:bg-accent-100 dark:hover:bg-accent-900/40 transition-colors"
+                              className="rounded-lg border border-primary-200 bg-white text-primary-700 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                             >
                               View Report
                             </button>
@@ -6354,7 +6354,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); openNewMissionModal({ name: `Rerun: ${entry.title}`, goal: entry.goal }) }}
-                              className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-2 py-1 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                              className="rounded-lg border border-primary-200 bg-white text-primary-700 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                             >
                               Re-run
                             </button>
@@ -6465,7 +6465,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                 setOutputPanelVisible(true)
                                 if (!selectedOutputAgentId && team.length > 0) setSelectedOutputAgentId(team[0].id)
                               }}
-                              className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                              className="rounded-lg border border-primary-200 bg-white text-primary-700 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                             >
                               Live Output ↗
                             </button>
@@ -6760,7 +6760,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'relative flex min-w-[108px] flex-1 items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-all sm:min-w-[120px] sm:px-4',
+                'relative flex min-w-[80px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-sm font-medium transition-all sm:min-w-[108px] sm:gap-1.5 sm:px-3 sm:py-2',
                 isActive
                   ? 'bg-white text-neutral-900 shadow-sm dark:bg-slate-700 dark:text-white'
                   : 'text-neutral-500 hover:bg-white hover:text-neutral-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white',
@@ -6770,7 +6770,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {isActive ? (
                 <span className="absolute inset-x-0 bottom-0 h-[2px] bg-orange-500" />
               ) : null}
-              <span aria-hidden className="text-base leading-none">{tab.icon}</span>
+              <span aria-hidden className="text-sm leading-none sm:text-base">{tab.icon}</span>
               <span className="shrink-0 whitespace-nowrap">{tab.label}</span>
               {/* Mission tab: animated running indicator */}
               {tab.id === 'missions' && isMissionRunning ? (
