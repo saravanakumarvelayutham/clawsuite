@@ -1375,6 +1375,70 @@ function ChatComposerComponent({
   )
 
   const keyboardOrFocusActive = mobileKeyboardInset > 0 || mobileComposerFocused
+
+  // Scroll-hide: hide composer when user scrolls up (reading older messages).
+  // Re-show when user scrolls down or reaches the bottom.
+  const [scrollHidden, setScrollHidden] = useState(false)
+  useEffect(() => {
+    if (!isMobileViewport) return
+    let lastScrollTop = 0
+    let accumulated = 0
+    const THRESHOLD = 40
+
+    const handleScroll = () => {
+      const viewport = document.querySelector('[data-chat-scroll-viewport]')
+      if (!(viewport instanceof HTMLElement)) return
+      const scrollTop = viewport.scrollTop
+      const maxScroll = viewport.scrollHeight - viewport.clientHeight
+      const delta = scrollTop - lastScrollTop
+      lastScrollTop = scrollTop
+
+      // Always show near bottom
+      if (maxScroll - scrollTop < 64) {
+        accumulated = 0
+        setScrollHidden(false)
+        return
+      }
+
+      if (delta < 0) {
+        accumulated += Math.abs(delta)
+        if (accumulated >= THRESHOLD) {
+          setScrollHidden(true)
+        }
+      } else if (delta > 0) {
+        accumulated = 0
+        setScrollHidden(false)
+      }
+    }
+
+    // Attach to the viewport once it's in the DOM
+    const attach = () => {
+      const viewport = document.querySelector('[data-chat-scroll-viewport]')
+      if (viewport instanceof HTMLElement) {
+        viewport.addEventListener('scroll', handleScroll, { passive: true })
+        return viewport
+      }
+      return null
+    }
+
+    // Retry attachment if viewport not yet rendered
+    let viewport = attach()
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    if (!viewport) {
+      retryTimer = setTimeout(() => {
+        viewport = attach()
+      }, 500)
+    }
+
+    return () => {
+      if (retryTimer) clearTimeout(retryTimer)
+      viewport?.removeEventListener('scroll', handleScroll)
+    }
+  }, [isMobileViewport])
+
+  // Always show composer when keyboard/focus is active
+  const effectiveScrollHidden = scrollHidden && !keyboardOrFocusActive
+
   const composerWrapperStyle = useMemo(
     () => {
       // When keyboard is active, lift by keyboard inset only (tab bar hides itself).
@@ -1385,9 +1449,13 @@ function ChatComposerComponent({
         : 'max(0px, var(--mobile-tab-bar-offset, 3.75rem))'
       const safeAreaInset = 'env(safe-area-inset-bottom, 0px)'
       const kbInset = 'var(--kb-inset, 0px)'
-      const mobileTranslate = keyboardOrFocusActive
-        ? `translateY(calc(-1 * (${kbInset})))`
-        : `translateY(calc(-1 * (${tabBarOffset} + ${safeAreaInset})))`
+      // When scroll-hidden on mobile, push the composer below the viewport
+      const hiddenOffset = effectiveScrollHidden ? '110%' : '0px'
+      const mobileTranslate = effectiveScrollHidden
+        ? `translateY(${hiddenOffset})`
+        : keyboardOrFocusActive
+          ? `translateY(calc(-1 * (${kbInset})))`
+          : `translateY(calc(-1 * (${tabBarOffset} + ${safeAreaInset})))`
       return {
         maxWidth: 'min(768px, 100%)',
         '--mobile-tab-bar-offset': MOBILE_TAB_BAR_OFFSET,
@@ -1395,7 +1463,7 @@ function ChatComposerComponent({
         WebkitTransform: isMobileViewport ? mobileTranslate : undefined,
       } as CSSProperties
     },
-    [isMobileViewport, keyboardOrFocusActive],
+    [isMobileViewport, keyboardOrFocusActive, effectiveScrollHidden],
   )
 
   return (
