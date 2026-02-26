@@ -1,21 +1,18 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  ArrowUp02Icon,
   BotIcon,
   Chat01Icon,
   Home01Icon,
-  PuzzleIcon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
-import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { TouchEvent } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
-import { useWorkspaceStore } from '@/stores/workspace-store'
 
 /** Height constant for consistent bottom insets on mobile routes with tab bar */
-export const MOBILE_TAB_BAR_OFFSET = 'var(--tabbar-h, 3.75rem)'
+export const MOBILE_TAB_BAR_OFFSET = 'var(--tabbar-h, 80px)'
 
 /**
  * Z-index layer map (documented for maintainability):
@@ -56,13 +53,6 @@ const TABS: TabItem[] = [
     match: (p) => p.startsWith('/chat') || p === '/new' || p === '/',
   },
   {
-    id: 'skills',
-    label: 'Skills',
-    icon: PuzzleIcon,
-    to: '/skills',
-    match: (p) => p.startsWith('/skills'),
-  },
-  {
     id: 'settings',
     label: 'Settings',
     icon: Settings01Icon,
@@ -74,136 +64,180 @@ const TABS: TabItem[] = [
 export function MobileTabBar() {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const setMobileKeyboardOpen = useWorkspaceStore((s) => s.setMobileKeyboardOpen)
-  const setMobileKeyboardInset = useWorkspaceStore((s) => s.setMobileKeyboardInset)
-  const setMobileComposerFocused = useWorkspaceStore(
-    (s) => s.setMobileComposerFocused,
-  )
   const navRef = useRef<HTMLElement>(null)
-  const indicatorTouchStartYRef = useRef<number | null>(null)
-  const hideTabBar = false  // tab bar always visible — composer sits above it
 
-  const revealTabBar = useCallback(() => {
-    const activeElement = document.activeElement
-    if (activeElement instanceof HTMLElement) {
-      activeElement.blur()
-    }
-    setMobileComposerFocused(false)
-    setMobileKeyboardOpen(false)
-    setMobileKeyboardInset(0)
-  }, [setMobileComposerFocused, setMobileKeyboardInset, setMobileKeyboardOpen])
+  // Drag-to-switch state
+  const dragStartXRef = useRef<number | null>(null)
+  const dragStartTimeRef = useRef<number | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
-  const handleIndicatorTouchStart = useCallback(
-    (event: TouchEvent<HTMLButtonElement>) => {
-      indicatorTouchStartYRef.current = event.touches[0]?.clientY ?? null
+  // isChatRoute = inside a specific conversation (not /chat/main)
+  const isChatRoute =
+    pathname.startsWith('/chat/') && pathname !== '/chat/main'
+
+  // Drag-to-switch: horizontal swipe across pill switches tabs
+  const handlePillTouchStart = useCallback(
+    (event: TouchEvent<HTMLElement>) => {
+      dragStartXRef.current = event.touches[0]?.clientX ?? null
+      dragStartTimeRef.current = Date.now()
+      setIsDragging(false)
     },
     [],
   )
 
-  const handleIndicatorTouchEnd = useCallback(
-    (event: TouchEvent<HTMLButtonElement>) => {
-      const startY = indicatorTouchStartYRef.current
-      indicatorTouchStartYRef.current = null
-      if (startY === null) return
-      const endY = event.changedTouches[0]?.clientY ?? startY
-      if (startY - endY > 12) {
-        revealTabBar()
+  const handlePillTouchMove = useCallback(
+    (_event: TouchEvent<HTMLElement>) => {
+      if (dragStartXRef.current !== null) {
+        setIsDragging(true)
       }
     },
-    [revealTabBar],
+    [],
   )
 
+  const handlePillTouchEnd = useCallback(
+    (event: TouchEvent<HTMLElement>) => {
+      const startX = dragStartXRef.current
+      dragStartXRef.current = null
+      setIsDragging(false)
+
+      if (startX === null) return
+      const endX = event.changedTouches[0]?.clientX ?? startX
+      const delta = endX - startX
+      const pillWidth = navRef.current?.getBoundingClientRect().width ?? 200
+      const threshold = pillWidth * 0.3
+
+      if (Math.abs(delta) < threshold) return
+
+      const currentIdx = TABS.findIndex((tab) => tab.match(pathname))
+      const nextIdx =
+        delta < 0
+          ? Math.min(currentIdx + 1, TABS.length - 1) // swipe left → next tab
+          : Math.max(currentIdx - 1, 0) // swipe right → prev tab
+
+      if (nextIdx !== currentIdx && nextIdx >= 0 && nextIdx < TABS.length) {
+        hapticTap()
+        void navigate({ to: TABS[nextIdx]!.to })
+      }
+    },
+    [navigate, pathname],
+  )
+
+  // Measure pill for --tabbar-h (~80px total = pill + bottom offset)
   useLayoutEffect(() => {
     const root = document.documentElement
     const measure = () => {
-      const height = navRef.current?.getBoundingClientRect().height ?? 0
-      if (height <= 0) return
-      root.style.setProperty('--tabbar-h', `${Math.ceil(height)}px`)
+      const el = navRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      if (rect.height <= 0) return
+      // pill height + 16px above safe area + safe area itself — use 80px as total scroll clearance
+      const total = Math.ceil(rect.height) + 24
+      root.style.setProperty('--tabbar-h', `${total}px`)
     }
 
     measure()
+    const ro = new ResizeObserver(measure)
+    if (navRef.current) ro.observe(navRef.current)
     window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
   }, [])
 
+  // Keep --tabbar-h fresh when tab bar hides/shows
+  useEffect(() => {
+    const root = document.documentElement
+    if (isChatRoute) {
+      // Tab bar hidden in chat routes — remove extra padding
+      root.style.setProperty('--tabbar-h', '0px')
+    } else {
+      // Restore measured value on next paint
+      const el = navRef.current
+      if (el) {
+        const rect = el.getBoundingClientRect()
+        if (rect.height > 0) {
+          root.style.setProperty('--tabbar-h', `${Math.ceil(rect.height) + 24}px`)
+        }
+      }
+    }
+  }, [isChatRoute])
+
   return (
-    <>
-      <nav
-        ref={navRef}
-        className={cn(
-          'fixed inset-x-0 bottom-0 z-40',
-          // Glass effect: frosted background + blur. No isolate — isolate breaks backdrop-filter on children.
-          'bg-white/90 backdrop-blur-xl dark:bg-neutral-900/90',
-          'pb-[max(var(--safe-b),env(safe-area-inset-bottom))]',
-          'md:hidden transition-all duration-200',
-          hideTabBar
-            ? 'translate-y-[110%] opacity-0 pointer-events-none'
-            : 'translate-y-0 opacity-100',
-        )}
-        aria-label="Mobile navigation"
-      >
-        <div className="grid grid-cols-5 gap-1 px-2 py-1.5">
-          {TABS.map((tab) => {
-            const isActive = tab.match(pathname)
-            const isCenterChat = tab.id === 'chat'
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
+    <nav
+      ref={navRef}
+      className={cn(
+        // Pill: fixed bottom center, auto width, not full-width
+        'fixed bottom-0 left-1/2 z-40 md:hidden',
+        '-translate-x-1/2',
+        // Vertical position: above home indicator
+        'mb-[calc(env(safe-area-inset-bottom,16px)+8px)]',
+        // Frosted glass pill
+        'bg-white/85 dark:bg-neutral-900/85 backdrop-blur-2xl',
+        'rounded-full',
+        'border border-white/40 dark:border-white/10',
+        'shadow-[0_8px_32px_rgba(0,0,0,0.18)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]',
+        // Inner padding
+        'px-3 py-2',
+        // Hide/show animation
+        'transition-transform duration-300 ease-in-out',
+        isChatRoute
+          ? 'translate-y-[120%]'
+          : 'translate-y-0',
+        isDragging ? 'cursor-grabbing' : '',
+      )}
+      aria-label="Mobile navigation"
+      onTouchStart={handlePillTouchStart}
+      onTouchMove={handlePillTouchMove}
+      onTouchEnd={handlePillTouchEnd}
+    >
+      <div className="flex items-center gap-1">
+        {TABS.map((tab, idx) => {
+          const isActive = tab.match(pathname)
+          const isCenter = tab.id === 'chat'
+          const circleSize = isCenter && isActive ? 'size-11' : isActive ? 'size-10' : 'size-11'
+
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                // Don't fire navigate if this was a drag swipe
+                if (!isDragging) {
                   hapticTap()
                   void navigate({ to: tab.to })
-                }}
-                aria-current={isActive ? 'page' : undefined}
+                }
+              }}
+              aria-current={isActive ? 'page' : undefined}
+              aria-label={tab.label}
+              className={cn(
+                // 44x44 touch target, icon centered
+                'flex items-center justify-center',
+                'size-11 rounded-full',
+                'transition-all duration-200 active:scale-90',
+                'select-none touch-manipulation',
+              )}
+              data-tab-idx={idx}
+            >
+              <span
                 className={cn(
-                  'flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[10px] font-medium transition-transform duration-150 active:scale-90',
-                  isCenterChat ? '-mt-2' : '',
+                  'flex items-center justify-center rounded-full transition-all duration-200',
+                  circleSize,
+                  isActive
+                    ? 'bg-accent-500 text-white shadow-sm'
+                    : 'text-neutral-400 dark:text-neutral-500',
                 )}
               >
-                <span
-                  className={cn(
-                    'flex items-center justify-center rounded-full transition-all duration-150',
-                    isCenterChat
-                      ? cn(
-                          'size-10 bg-accent-500 text-white shadow-sm',
-                          isActive && 'ring-1 ring-accent-300/30 shadow-sm',
-                        )
-                      : isActive
-                        ? 'size-7 bg-accent-500/15 text-accent-600'
-                        : 'size-7 text-primary-400',
-                  )}
-                >
-                  <HugeiconsIcon
-                    icon={tab.icon}
-                    size={isCenterChat ? 20 : 17}
-                    strokeWidth={isCenterChat ? 1.8 : isActive ? 2 : 1.6}
-                  />
-                </span>
-                <span
-                  className={cn(
-                    'leading-tight',
-                    isActive ? 'text-accent-600' : 'text-primary-400',
-                  )}
-                >
-                  {tab.label}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </nav>
-      {hideTabBar ? (
-        <button
-          type="button"
-          onClick={revealTabBar}
-          onTouchStart={handleIndicatorTouchStart}
-          onTouchEnd={handleIndicatorTouchEnd}
-          className="fixed bottom-[calc(var(--safe-b)+0.3rem)] left-1/2 z-50 -translate-x-1/2 rounded-full border border-primary-200/70 bg-surface/75 px-2.5 py-1 text-primary-500 shadow-sm backdrop-blur-sm transition-colors hover:bg-surface/90 md:hidden"
-          aria-label="Show navigation bar"
-        >
-          <HugeiconsIcon icon={ArrowUp02Icon} size={14} strokeWidth={1.8} />
-        </button>
-      ) : null}
-    </>
+                <HugeiconsIcon
+                  icon={tab.icon}
+                  size={isCenter ? 22 : 20}
+                  strokeWidth={isActive ? 2 : 1.6}
+                />
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </nav>
   )
 }
