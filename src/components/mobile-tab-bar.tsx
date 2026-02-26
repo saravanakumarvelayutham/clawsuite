@@ -133,8 +133,7 @@ export function MobileTabBar() {
         className={cn(
           'fixed inset-x-0 bottom-0 z-40',
           // Glass effect: frosted background + blur. No isolate — isolate breaks backdrop-filter on children.
-          'bg-white/80 backdrop-blur-xl dark:bg-neutral-900/80',
-          'border-t border-white/20 dark:border-white/10',
+          'bg-white/90 backdrop-blur-xl dark:bg-neutral-900/90',
           'pb-[max(var(--safe-b),env(safe-area-inset-bottom))]',
           'md:hidden transition-all duration-200',
           hideTabBar
