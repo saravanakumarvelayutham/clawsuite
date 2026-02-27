@@ -4894,6 +4894,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
   const _modalSelectedBudgetTokens = parseTokenBudget(newMissionBudgetLimit)
   const _modalSelectedTotalBudgetCost = _modalSelectedBudgetTokens ? estimateMissionCost(_modalSelectedBudgetTokens) : null
 
+  function renderCompactionBanner() {
+    if (!compactionBanner) return null
+
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300">
+        <span className="animate-spin">⚙️</span>
+        <span>{compactionBanner}</span>
+        <button
+          type="button"
+          onClick={() => setCompactionBanner(null)}
+          className="ml-auto text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-200"
+          aria-label="Dismiss"
+        >
+          ✕
+        </button>
+      </div>
+    )
+  }
+
   function renderOverviewContent() {
     // ── Derived data ───────────────────────────────────────────────────────
     const runningCost = estimateMissionCost(missionTokenCount)
@@ -4975,6 +4994,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
         <div className="relative mx-auto mt-3 sm:mt-5 w-full max-w-[1600px] shrink-0 sm:flex-1 sm:min-h-0 px-3 sm:px-4 flex flex-col">
+          {renderCompactionBanner()}
           <div className="h-[240px] sm:flex-1 sm:h-auto sm:min-h-[420px] overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm">
             <PixelOfficeView
               agentRows={agentWorkingRows}
@@ -5254,6 +5274,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       <div className="relative flex min-h-full flex-col overflow-x-hidden p-3 sm:p-4 md:h-full md:min-h-0 md:overflow-y-auto dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-3 sm:gap-4">
+        {renderCompactionBanner()}
 
         {/* ── Header + contextual action ── */}
           <div className={HUB_PAGE_HEADER_CARD_CLASS}>
@@ -6246,20 +6267,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </div>
 
           {/* ── Compaction Banner ──────────────────────────────────────── */}
-          {compactionBanner && (
-            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300">
-              <span className="animate-spin">⚙️</span>
-              <span>{compactionBanner}</span>
-              <button
-                type="button"
-                onClick={() => setCompactionBanner(null)}
-                className="ml-auto text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-200"
-                aria-label="Dismiss"
-              >
-                ✕
-              </button>
-            </div>
-          )}
+          {renderCompactionBanner()}
 
           {/* ── Mission List ────────────────────────────────────────────── */}
           <div className="min-h-0 flex-1 overflow-auto">
@@ -6955,6 +6963,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           </div>
         )}
       </div>
+
+      {compactionBanner ? (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-6 text-center shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
+            <div
+              className="mx-auto mb-3 size-8 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-700 dark:border-neutral-600 dark:border-t-neutral-100"
+              aria-hidden
+            />
+            <h3 className="text-base font-semibold text-neutral-900 dark:text-white">Compacting context...</h3>
+            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
+              Agent memory is being compressed. This may take a few seconds.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {/* ── New Mission Modal (global — renders on any tab) ───────────────── */}
       {missionBoardModalOpen ? (

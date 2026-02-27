@@ -1,5 +1,7 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
   ArrowDown01Icon,
   BotIcon,
   BrainIcon,
@@ -18,7 +20,6 @@ import {
   Search01Icon,
   ApiIcon,
   Settings01Icon,
-  SidebarLeft01Icon,
   ServerStack01Icon,
   SmartPhone01Icon,
   Task01Icon,
@@ -688,6 +689,15 @@ function ChatSidebarComponent({
   }, [isCollapsed, isMobile])
 
   const isVisuallyCollapsed = isCollapsed && !isHoverExpanded
+  const isHoverPreviewExpanded = !isMobile && isCollapsed && isHoverExpanded
+
+  function handleSidebarToggle() {
+    if (isHoverPreviewExpanded) {
+      setIsHoverExpanded(false)
+      return
+    }
+    onToggleCollapse()
+  }
 
   const asideProps = {
     className: cn(
@@ -939,10 +949,7 @@ function ChatSidebarComponent({
       <motion.div
         layout
         transition={{ layout: transition }}
-        className={cn(
-          'flex items-center h-12 px-2',
-          isVisuallyCollapsed ? 'justify-center' : 'justify-between',
-        )}
+        className="relative flex h-12 items-center px-2"
       >
         <AnimatePresence initial={false}>
           {!isVisuallyCollapsed ? (
@@ -968,29 +975,33 @@ function ChatSidebarComponent({
         <TooltipProvider>
           <TooltipRoot>
             <TooltipTrigger
-              onClick={onToggleCollapse}
+              onClick={handleSidebarToggle}
               render={
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={isCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
-                  className="shrink-0"
+                  aria-label={isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+                  className="absolute right-2 top-1/2 shrink-0 -translate-y-1/2 opacity-80 hover:opacity-100"
                   data-tour="sidebar-collapse-toggle"
                 >
-                  {isCollapsed ? (
-                    <OpenClawStudioIcon className="size-5 rounded-sm" />
+                  {isVisuallyCollapsed ? (
+                    <HugeiconsIcon
+                      icon={ArrowRight01Icon}
+                      size={18}
+                      strokeWidth={1.75}
+                    />
                   ) : (
                     <HugeiconsIcon
-                      icon={SidebarLeft01Icon}
-                      size={20}
-                      strokeWidth={1.5}
+                      icon={ArrowLeft01Icon}
+                      size={18}
+                      strokeWidth={1.75}
                     />
                   )}
                 </Button>
               }
             />
             <TooltipContent side="right">
-              {isCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
+              {isVisuallyCollapsed ? 'Open Sidebar' : 'Close Sidebar'}
             </TooltipContent>
           </TooltipRoot>
         </TooltipProvider>
