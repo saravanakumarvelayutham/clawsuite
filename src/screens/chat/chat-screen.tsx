@@ -45,6 +45,7 @@ import { useChatMobile } from './hooks/use-chat-mobile'
 import { useChatSessions } from './hooks/use-chat-sessions'
 import { useAutoSessionTitle } from './hooks/use-auto-session-title'
 import { useRenameSession } from './hooks/use-rename-session'
+import { useContextAlert } from './hooks/use-context-alert'
 import { ContextBar } from './components/context-bar'
 import {
   addApproval,
@@ -73,6 +74,7 @@ import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 import { useChatActivityStore } from '@/stores/chat-activity-store'
 import { MobileSessionsPanel } from '@/components/mobile-sessions-panel'
+import { ContextAlertModal } from '@/components/usage-meter/context-alert-modal'
 // MOBILE_TAB_BAR_OFFSET removed — tab bar always hidden in chat
 import { useTapDebug } from '@/hooks/use-tap-debug'
 
@@ -247,6 +249,8 @@ export function ChatScreen({
     [],
   )
   const [isCompacting, setIsCompacting] = useState(false)
+  const { alertOpen, alertThreshold, alertPercent, dismissAlert } =
+    useContextAlert()
 
   const pendingStartRef = useRef(false)
   const composerHandleRef = useRef<ChatComposerHandle | null>(null)
@@ -1864,6 +1868,13 @@ export function ChatScreen({
           }}
         />
       )}
+
+      <ContextAlertModal
+        open={alertOpen}
+        onClose={dismissAlert}
+        threshold={alertThreshold}
+        contextPercent={alertPercent}
+      />
     </div>
   )
 }
