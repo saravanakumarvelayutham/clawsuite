@@ -20,7 +20,7 @@ export function OpenClawStudioIcon({
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 100 95"
+      viewBox="0 0 100 100"
       fill="none"
       className={className}
     >
@@ -40,7 +40,7 @@ export function OpenClawStudioIcon({
         x="0"
         y="0"
         width="100"
-        height="95"
+        height="100"
         rx="0"
         fill={`url(#${gradId})`}
       />
