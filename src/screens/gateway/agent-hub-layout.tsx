@@ -5252,12 +5252,39 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-4">
 
-        {/* ── Header + horizontal pill tabs ── */}
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
+        {/* ── Header + contextual action ── */}
+          <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
             <div>
               <h2 className={HUB_PAGE_TITLE_CLASS}>Configure</h2>
               <p className="text-xs text-neutral-500 dark:text-slate-400">Configure agents, teams, API keys, and approvals</p>
             </div>
+            {configSection === 'agents' ? (
+              <button
+                type="button"
+                onClick={handleAddAgent}
+                className={cn('flex shrink-0 items-center gap-1.5', HUB_PRIMARY_BUTTON_CLASS)}
+              >
+                + Add Agent
+              </button>
+            ) : null}
+            {configSection === 'teams' ? (
+              <button
+                type="button"
+                onClick={() => setShowAddTeamModal(true)}
+                className={cn('flex shrink-0 items-center gap-1.5', HUB_PRIMARY_BUTTON_CLASS)}
+              >
+                + Add Team
+              </button>
+            ) : null}
+            {configSection === 'keys' ? (
+              <button
+                type="button"
+                onClick={() => { setProviderWizardStep('select'); setProviderWizardSelected(''); setAddProviderApiKey(''); setAddProviderBaseUrl(''); setAddProviderApiType('openai-completions'); setAddProviderName(''); setShowAddProviderModal(true) }}
+                className={cn('flex shrink-0 items-center gap-1.5', HUB_PRIMARY_BUTTON_CLASS)}
+              >
+                + Add Provider
+              </button>
+            ) : null}
           </div>
 
         {/* ── Horizontal pill navigation ── */}
@@ -5289,36 +5316,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               )
             })}
           </div>
-          {configSection === 'agents' ? (
-            <button
-              type="button"
-              onClick={handleAddAgent}
-              className={cn('flex shrink-0 items-center gap-1.5', HUB_PRIMARY_BUTTON_CLASS)}
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-              Add Agent
-            </button>
-          ) : null}
-          {configSection === 'teams' ? (
-            <button
-              type="button"
-              onClick={() => setShowAddTeamModal(true)}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-accent-600 transition-colors"
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-              New Team
-            </button>
-          ) : null}
-          {configSection === 'keys' ? (
-            <button
-              type="button"
-              onClick={() => { setProviderWizardStep('select'); setProviderWizardSelected(''); setAddProviderApiKey(''); setAddProviderBaseUrl(''); setAddProviderApiType('openai-completions'); setAddProviderName(''); setShowAddProviderModal(true) }}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-accent-600 transition-colors"
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-              Add Provider
-            </button>
-          ) : null}
         </div>
 
         {/* ── Content area ── */}
@@ -5387,15 +5384,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </div>
                   )
                 })}
-                {/* Add Agent compact row */}
-                <button
-                  type="button"
-                  onClick={handleAddAgent}
-                  className="flex w-full items-center gap-2.5 rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2.5 text-left transition-all hover:border-orange-400 hover:bg-orange-50/30"
-                >
-                  <span className="flex size-6 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-sm text-neutral-400">+</span>
-                  <span className="text-xs font-medium text-neutral-400 dark:text-neutral-500">Add Agent</span>
-                </button>
               </div>
 
               {/* Desktop: full card grid */}
@@ -5466,15 +5454,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 )
               })}
 
-              {/* Add Agent card */}
-              <button
-                type="button"
-                onClick={handleAddAgent}
-                className="flex min-h-[160px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-center transition-all hover:border-orange-400 hover:bg-orange-50/30 dark:hover:border-orange-700 dark:hover:bg-orange-900/10"
-              >
-                <span className="flex size-10 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-xl text-neutral-400">+</span>
-                <span className="text-xs font-medium text-neutral-400 dark:text-neutral-500">Add Agent</span>
-              </button>
               </div>
 
               {/* ── Agent Wizard Modals ── */}
