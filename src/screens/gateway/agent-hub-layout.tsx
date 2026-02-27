@@ -6188,7 +6188,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <span className="md:hidden">Missions</span>
                 <span className="hidden md:inline">Mission Control</span>
               </h2>
-              <p className="hidden md:block text-xs text-neutral-500 dark:text-neutral-400">Track active runs, review history, and launch new missions</p>
+              <p className="hidden md:block text-xs text-neutral-500 dark:text-neutral-400">Track and manage all agent runs</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -6218,7 +6218,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
           )}
 
           {/* ── Filter Bar — scrollable on mobile, full flex on desktop ── */}
-          <div className="flex w-full items-center gap-1 overflow-x-auto rounded-xl bg-neutral-100 dark:bg-neutral-900/80 dark:border dark:border-neutral-700/50 p-1 scrollbar-none">
+          <div className="flex w-full items-center gap-2 overflow-x-auto scrollbar-none">
             {filterTabs.map((tab) => {
               const isActive = missionSubTab === tab.id
               return (
@@ -6227,25 +6227,25 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   type="button"
                   onClick={() => setMissionSubTab(tab.id)}
                   className={cn(
-                    'flex shrink-0 items-center gap-1 transition-colors sm:flex-1',
+                    'min-h-11 shrink-0 rounded-lg px-3 py-2 text-sm font-semibold flex items-center gap-1.5 whitespace-nowrap transition-colors',
                     isActive
-                      ? 'rounded-lg bg-white dark:bg-neutral-800 px-3 py-1 sm:py-1.5 text-center text-xs sm:text-sm font-semibold text-accent-600 dark:text-accent-400 shadow-sm sm:py-2'
-                      : 'rounded-lg px-3 py-1 sm:py-1.5 text-center text-xs sm:text-sm font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300 sm:py-2',
+                      ? 'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-300'
+                      : 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700',
                   )}
                 >
-                  <span className="mx-auto flex items-center gap-1 sm:gap-1.5 whitespace-nowrap">
-                    {tab.label}
-                    {tab.count > 0 && (
-                      <span className={cn(
-                        'inline-flex min-w-[16px] items-center justify-center rounded-full px-1 py-0.5 text-[10px] sm:text-[10px] font-bold leading-none',
+                  <span>{tab.label}</span>
+                  {tab.count > 0 && (
+                    <span
+                      className={cn(
+                        'inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none',
                         isActive
-                          ? 'bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-400'
-                          : 'bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400',
-                      )}>
-                        {tab.count}
-                      </span>
-                    )}
-                  </span>
+                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'
+                          : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300',
+                      )}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
                 </button>
               )
             })}
