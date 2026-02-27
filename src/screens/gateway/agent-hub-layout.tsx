@@ -229,6 +229,12 @@ const CONFIG_SECTIONS: Array<{ id: ConfigSection; icon: string; label: string }>
   { id: 'keys', icon: '🔑', label: 'API Keys' },
 ]
 
+const HUB_PAGE_TITLE_CLASS = 'text-lg font-bold text-neutral-900 dark:text-neutral-100 md:text-xl'
+const HUB_SUBSECTION_TITLE_CLASS = 'text-base font-bold text-neutral-900 dark:text-white'
+const HUB_CARD_LABEL_CLASS = 'text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400'
+const HUB_PRIMARY_BUTTON_CLASS = 'min-h-11 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-600 sm:px-4 sm:py-2 sm:text-sm'
+const HUB_SECONDARY_BUTTON_CLASS = 'min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 sm:px-4 sm:py-2 sm:text-sm'
+
 const WIZARD_STEP_ORDER: WizardStep[] = ['gateway', 'team', 'goal', 'launch']
 
 // ── Team Quick-Start Templates ──
@@ -1958,7 +1964,7 @@ export function AgentAvatar({
 
 // ── Agent accent colors (indexed per agent slot) ───────────────────────────────
 const AGENT_ACCENT_COLORS = [
-  { bar: 'bg-orange-500', border: 'border-orange-500', avatar: 'bg-orange-100', text: 'text-orange-600', ring: 'ring-orange-500/20' },
+  { bar: 'bg-accent-500', border: 'border-orange-500', avatar: 'bg-orange-100', text: 'text-orange-600', ring: 'ring-orange-500/20' },
   { bar: 'bg-blue-500', border: 'border-blue-500', avatar: 'bg-blue-100', text: 'text-blue-600', ring: 'ring-blue-500/20' },
   { bar: 'bg-violet-500', border: 'border-violet-500', avatar: 'bg-violet-100', text: 'text-violet-600', ring: 'ring-violet-500/20' },
   { bar: 'bg-emerald-500', border: 'border-emerald-500', avatar: 'bg-emerald-100', text: 'text-emerald-600', ring: 'ring-emerald-500/20' },
@@ -2146,7 +2152,7 @@ function OfficeView({
         {/* Process type badge */}
         <div className="flex items-center gap-2 shrink-0">
           {missionRunning && (
-            <span className="flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
+            <span className="flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
               <span className="relative flex size-1.5">
                 <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/60" />
                 <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
@@ -2156,7 +2162,7 @@ function OfficeView({
           )}
           <span
             className={cn(
-              'rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider',
+              'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
               processTypeBadgeClass,
             )}
           >
@@ -2258,7 +2264,7 @@ function OfficeView({
 
                 <p
                   className={cn(
-                    'mt-2 text-[11px] font-medium',
+                    'mt-2 text-xs font-medium',
                     statusMeta.className,
                   )}
                 >
@@ -2277,7 +2283,7 @@ function OfficeView({
                 {/* Footer: task count badge */}
                 {agent.taskCount > 0 ? (
                   <div className="mt-2">
-                    <span className="rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[9px] font-semibold text-neutral-600 dark:text-slate-400">
+                    <span className="rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2 py-0.5 text-[10px] font-semibold text-neutral-600 dark:text-slate-400">
                       {agent.taskCount} task{agent.taskCount !== 1 ? 's' : ''}
                     </span>
                   </div>
@@ -2289,7 +2295,7 @@ function OfficeView({
                   title="Click to view agent output"
                   onClick={() => onViewOutput(agent.id)}
                   className={cn(
-                    'mt-auto w-full cursor-pointer rounded-lg border px-2 py-2 text-[11px] font-medium transition-colors',
+                    'mt-auto w-full cursor-pointer rounded-lg border px-2 py-2 text-xs font-medium transition-colors',
                     isSelected
                       ? 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
                       : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700',
@@ -2420,7 +2426,7 @@ function HistoryView() {
       {/* Local checkpoint history */}
       {hasLocalHistory ? (
         <div className="space-y-3">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-700 dark:text-neutral-300">📦 Local Checkpoints</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-700 dark:text-neutral-300">📦 Local Checkpoints</p>
           {localHistory.map((cp) => {
             const completedTasks = cp.tasks.filter(t => t.status === 'done' || t.status === 'completed').length
             const totalTasks = cp.tasks.length
@@ -2438,10 +2444,10 @@ function HistoryView() {
                   <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
                     {cp.label}
                   </h3>
-                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold', statusBadge!.className)}>
+                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold', statusBadge!.className)}>
                     {statusBadge!.label}
                   </span>
-                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold capitalize', processClass)}>
+                  <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize', processClass)}>
                     {cp.processType}
                   </span>
                 </div>
@@ -2462,14 +2468,14 @@ function HistoryView() {
                       )
                     })}
                     {cp.team.length > 5 ? (
-                      <span className="flex size-6 items-center justify-center rounded-full border border-white bg-neutral-200 text-[9px] font-bold text-neutral-600 dark:text-slate-400">
+                      <span className="flex size-6 items-center justify-center rounded-full border border-white bg-neutral-200 text-[10px] font-bold text-neutral-600 dark:text-slate-400">
                         +{cp.team.length - 5}
                       </span>
                     ) : null}
                   </div>
                 ) : null}
 
-                <div className="flex items-center gap-3 font-mono text-[9px] text-neutral-700 dark:text-neutral-400">
+                <div className="flex items-center gap-3 font-mono text-[10px] text-neutral-700 dark:text-neutral-400">
                   {totalTasks > 0 ? (
                     <span>{completedTasks}/{totalTasks} tasks</span>
                   ) : null}
@@ -2485,7 +2491,7 @@ function HistoryView() {
       {hasApiSessions ? (
         <div className="space-y-3">
           {hasLocalHistory ? (
-            <p className="text-[9px] font-bold uppercase tracking-widest text-neutral-700 dark:text-neutral-300">🌐 Gateway Sessions</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-700 dark:text-neutral-300">🌐 Gateway Sessions</p>
           ) : null}
           {sessions.map((session) => {
             const sessionId = readSessionId(session)
@@ -2524,7 +2530,7 @@ function HistoryView() {
                       </h3>
                       <span
                         className={cn(
-                          'shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold',
+                          'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
                           statusBadge.className,
                         )}
                       >
@@ -2536,7 +2542,7 @@ function HistoryView() {
                         {lastMessage}
                       </p>
                     ) : null}
-                    <div className="mt-2 flex items-center gap-3 font-mono text-[9px] text-neutral-700 dark:text-neutral-400">
+                    <div className="mt-2 flex items-center gap-3 font-mono text-[10px] text-neutral-700 dark:text-neutral-400">
                       {updatedAt > 0 ? <span>{timeAgoFromMs(updatedAt)}</span> : null}
                       {tokenCount !== undefined ? (
                         <span>{tokenCount.toLocaleString()} tokens</span>
@@ -2554,18 +2560,18 @@ function HistoryView() {
 
                 {isExpanded ? (
                   <div className="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-                    <p className="mb-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400">
+                    <p className="mb-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400">
                       Session Details
                     </p>
                     <dl className="space-y-1.5">
                       <div className="flex gap-2">
-                        <dt className="shrink-0 font-mono text-[9px] text-neutral-500 dark:text-slate-400">ID</dt>
-                        <dd className="truncate font-mono text-[9px] text-neutral-600 dark:text-slate-400">{sessionId}</dd>
+                        <dt className="shrink-0 font-mono text-[10px] text-neutral-500 dark:text-slate-400">ID</dt>
+                        <dd className="truncate font-mono text-[10px] text-neutral-600 dark:text-slate-400">{sessionId}</dd>
                       </div>
                       {lastMessage ? (
                         <div className="flex flex-col gap-0.5">
-                          <dt className="font-mono text-[9px] text-neutral-700 dark:text-neutral-400">Last output</dt>
-                          <dd className="line-clamp-4 font-mono text-[9px] text-neutral-500 dark:text-slate-400">{lastMessage}</dd>
+                          <dt className="font-mono text-[10px] text-neutral-700 dark:text-neutral-400">Last output</dt>
+                          <dd className="line-clamp-4 font-mono text-[10px] text-neutral-500 dark:text-slate-400">{lastMessage}</dd>
                         </div>
                       ) : null}
                     </dl>
@@ -4962,7 +4968,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
     const insetCls = 'rounded-lg border border-neutral-100 bg-neutral-50/70 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-800/50'
 
     return (
-      <div className="relative flex flex-col min-h-full sm:h-full sm:min-h-0 sm:overflow-hidden dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex min-h-full flex-col overflow-x-hidden sm:h-full sm:min-h-0 sm:overflow-hidden dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         {/* ── Virtual Office Hero — flex-1 fills all remaining space ── */}
         <div className="relative mx-auto mt-3 sm:mt-5 w-full max-w-[1600px] shrink-0 sm:flex-1 sm:min-h-0 px-3 sm:px-4 flex flex-col">
@@ -4997,11 +5003,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <article className={cardCls}>
               <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400">Active Team</h2>
+                <h2 className={HUB_CARD_LABEL_CLASS}>Active Team</h2>
                 <button
                   type="button"
                   onClick={() => { setActiveTab('configure'); setConfigSection('teams') }}
-                  className="rounded-lg border border-primary-200 bg-white text-primary-700 px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm font-medium hover:bg-neutral-50 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                  className={HUB_SECONDARY_BUTTON_CLASS}
                 >
                   Switch Team
                 </button>
@@ -5014,7 +5020,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <button
                     type="button"
                     onClick={() => { setActiveTab('configure'); setConfigSection('teams') }}
-                    className="mt-1 rounded-lg bg-accent-500 text-white px-4 py-2 text-sm font-semibold hover:bg-accent-600 transition-colors"
+                    className={cn('mt-1', HUB_PRIMARY_BUTTON_CLASS)}
                   >
                     + Create Team
                   </button>
@@ -5056,7 +5062,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">{member.name}</div>
                           </div>
-                          <span className={cn('shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-medium', getOfficeModelBadge(member.modelId))}>
+                          <span className={cn('shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-medium', getOfficeModelBadge(member.modelId))}>
                             {getModelShortLabel(member.modelId, gatewayModelLabelById)}
                           </span>
                           <span className={cn('size-1.5 shrink-0 rounded-full',
@@ -5079,11 +5085,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <article className={cardCls}>
               <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400">Recent Missions</h2>
+                <h2 className={HUB_CARD_LABEL_CLASS}>Recent Missions</h2>
                 <button
                   type="button"
                   onClick={() => setActiveTab('missions')}
-                  className="rounded-lg border border-primary-200 bg-white text-primary-700 px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm font-medium hover:bg-neutral-50 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                  className={HUB_SECONDARY_BUTTON_CLASS}
                 >
                   View All →
                 </button>
@@ -5097,7 +5103,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
+                    <p className="truncate text-sm font-semibold text-emerald-800 dark:text-emerald-300">
                       {truncateMissionGoal(activeMissionGoal || missionGoal || 'Active mission', 48)}
                     </p>
                     {/* Agent/time detail hidden on mobile */}
@@ -5105,7 +5111,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       Running · {missionElapsed} · {team.length} agents
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-400">
+                  <span className="shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
                     ⟳ Live
                   </span>
                 </div>
@@ -5118,7 +5124,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <button
                     type="button"
                     onClick={() => openNewMissionModal()}
-                    className="mt-1 rounded-lg bg-accent-500 text-white px-4 py-2 text-sm font-semibold hover:bg-accent-600 transition-colors"
+                    className={cn('mt-1', HUB_PRIMARY_BUTTON_CLASS)}
                   >
                     + New Mission
                   </button>
@@ -5136,7 +5142,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         className={cn('flex items-center gap-2', insetCls, matchReport && 'cursor-pointer hover:border-accent-300 dark:hover:border-accent-700 transition-colors')}
                         onClick={() => { if (matchReport) setSelectedReport(matchReport) }}
                       >
-                        <span className={cn('shrink-0 text-[11px] font-bold', statusCls)}>{statusIcon}</span>
+                        <span className={cn('shrink-0 text-xs font-bold', statusCls)}>{statusIcon}</span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">
                             {truncateMissionGoal(mission.name || mission.goal, 44)}
@@ -5147,7 +5153,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           </p>
                         </div>
                         <span className={cn(
-                          'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
+                          'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
                           mission.failed ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
                         )}>
                           {mission.failed ? 'Failed' : 'Done'}
@@ -5163,7 +5169,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <article className={cn(cardCls, 'hidden sm:block')}>
               <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-orange-500 via-orange-400/40 to-transparent" />
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400">Usage &amp; Cost</h2>
+                <h2 className={HUB_CARD_LABEL_CLASS}>Usage &amp; Cost</h2>
                 <span className="rounded-full border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
                   Today
                 </span>
@@ -5172,17 +5178,17 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {/* Key metrics row */}
               <div className="mb-3 grid grid-cols-3 gap-2">
                 <div className={cn(insetCls, 'text-center')}>
-                  <p className="text-[9px] uppercase tracking-wide text-neutral-400 mb-0.5">Sessions</p>
+                  <p className="text-[10px] uppercase tracking-wide text-neutral-400 mb-0.5">Sessions</p>
                   <p className="text-sm font-bold text-neutral-900 dark:text-white">{todaySessions > 0 ? todaySessions : '—'}</p>
                 </div>
                 <div className={cn(insetCls, 'text-center')}>
-                  <p className="text-[9px] uppercase tracking-wide text-neutral-400 mb-0.5">Tokens</p>
+                  <p className="text-[10px] uppercase tracking-wide text-neutral-400 mb-0.5">Tokens</p>
                   <p className="text-sm font-bold text-neutral-900 dark:text-white">
                     {todayTokens > 0 ? (todayTokens >= 1000 ? `${Math.round(todayTokens / 1000)}k` : todayTokens) : '—'}
                   </p>
                 </div>
                 <div className={cn(insetCls, 'text-center')}>
-                  <p className="text-[9px] uppercase tracking-wide text-neutral-400 mb-0.5">Est. Cost</p>
+                  <p className="text-[10px] uppercase tracking-wide text-neutral-400 mb-0.5">Est. Cost</p>
                   <p className="text-sm font-bold text-orange-600 dark:text-orange-400">
                     {todayEstCost > 0 ? `$${todayEstCost.toFixed(2)}` : '$0.00'}
                   </p>
@@ -5196,9 +5202,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <div className="flex items-center gap-1.5">
                     <span className="relative flex size-1.5 shrink-0">
                       <span className="absolute inset-0 animate-ping rounded-full bg-orange-400/60" />
-                      <span className="relative inline-flex size-1.5 rounded-full bg-orange-500" />
+                      <span className="relative inline-flex size-1.5 rounded-full bg-accent-500" />
                     </span>
-                    <span className="font-mono text-[11px] font-semibold text-neutral-800 dark:text-white">
+                    <span className="font-mono text-xs font-semibold text-neutral-800 dark:text-white">
                       ${runningCost.toFixed(2)} · {missionElapsed}
                     </span>
                   </div>
@@ -5208,7 +5214,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               {/* Provider breakdown */}
               {providerBreakdown.length > 0 ? (
                 <div>
-                  <p className="mb-1.5 text-[9px] uppercase tracking-wide text-neutral-400">Providers in Use</p>
+                  <p className="mb-1.5 text-[10px] uppercase tracking-wide text-neutral-400">Providers in Use</p>
                   <div className="space-y-1.5">
                     {providerBreakdown.map(([provider, count]) => {
                       const pct = team.length > 0 ? Math.round((count / team.length) * 100) : 0
@@ -5221,7 +5227,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                               style={{ width: `${Math.max(10, pct)}%` }}
                             />
                           </div>
-                          <span className="w-8 shrink-0 text-right text-[9px] text-neutral-400">{count}×</span>
+                          <span className="w-8 shrink-0 text-right text-[10px] text-neutral-400">{count}×</span>
                         </div>
                       )
                     })}
@@ -5242,25 +5248,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   function renderConfigureContent() {
     return (
-      <div className="relative flex min-h-full flex-col p-4 md:h-full md:min-h-0 md:overflow-y-auto dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex min-h-full flex-col overflow-x-hidden p-4 md:h-full md:min-h-0 md:overflow-y-auto dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
         <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-4">
 
         {/* ── Header + horizontal pill tabs ── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
-          <div>
-            <h2 className="text-lg font-bold text-neutral-900 dark:text-white">Settings</h2>
-            <p className="text-xs text-neutral-500 dark:text-slate-400">Configure agents, teams, API keys, and approvals</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab('overview')}
-              className="rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-            >
-              ← Back
-            </button>
-          </div>
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
+            <div>
+              <h2 className={HUB_PAGE_TITLE_CLASS}>Settings</h2>
+              <p className="text-xs text-neutral-500 dark:text-slate-400">Configure agents, teams, API keys, and approvals</p>
+            </div>
           </div>
 
         {/* ── Horizontal pill navigation ── */}
@@ -5274,16 +5271,16 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 type="button"
                 onClick={() => setConfigSection(section.id)}
                 className={cn(
-                  'flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+                  'flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors whitespace-nowrap',
                   isActive
-                    ? 'border border-orange-200 bg-orange-50 text-orange-700'
-                    : 'border border-transparent text-neutral-600 hover:bg-neutral-100',
+                    ? 'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-300'
+                    : 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700',
                 )}
               >
                 <span aria-hidden>{section.icon}</span>
                 <span>{section.label}</span>
                 {badge ? (
-                  <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  <span className="rounded-full bg-accent-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                     {badge}
                   </span>
                 ) : null}
@@ -5293,12 +5290,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
         </div>
 
         {/* ── Content area ── */}
-        <div className="min-w-0 overflow-y-auto">
+        <div className="min-w-0 overflow-y-auto overflow-x-hidden">
           {configSection === 'agents' ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-2 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-primary-200 bg-primary-50/95 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
                 <div>
-                  <h2 className="text-base font-bold text-neutral-900 dark:text-white">Configured Agents</h2>
+                  <h2 className={HUB_SUBSECTION_TITLE_CLASS}>Configured Agents</h2>
                   <p className="hidden sm:block text-xs text-neutral-500 dark:text-slate-400">
                     Edit agent identity, model, role description, and system prompt.
                   </p>
@@ -5306,7 +5303,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <button
                   type="button"
                   onClick={handleAddAgent}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-orange-500 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors sm:px-3"
+                  className={cn('flex shrink-0 items-center gap-1.5', HUB_PRIMARY_BUTTON_CLASS)}
                 >
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
                   Add Agent
@@ -5346,7 +5343,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         <button
                           type="button"
                           onClick={() => setAgentWizardOpenId(member.id)}
-                          className="shrink-0 flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200 transition-colors"
+                          className="shrink-0 flex size-11 items-center justify-center rounded-full bg-neutral-100 text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-700 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
                           aria-label="Edit agent"
                         >
                           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -5357,7 +5354,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         <button
                           type="button"
                           onClick={() => setTeam((prev) => [...prev, { ...member, status: 'available' }])}
-                          className="shrink-0 flex size-7 items-center justify-center rounded-full bg-orange-50 dark:bg-orange-900/20 text-orange-500 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
+                          className="shrink-0 flex size-11 items-center justify-center rounded-full bg-orange-50 text-orange-500 transition-colors hover:bg-orange-100 dark:bg-orange-900/20 dark:hover:bg-orange-900/40"
                           aria-label="Add to active team"
                         >
                           <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
@@ -5394,7 +5391,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       <button
                         type="button"
                         onClick={() => setAgentWizardOpenId(member.id)}
-                        className="absolute right-2.5 top-2.5 z-10 flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 transition-all hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-700 dark:hover:text-neutral-200"
+                        className="absolute right-2.5 top-2.5 z-10 flex size-11 items-center justify-center rounded-full bg-neutral-100 text-neutral-400 transition-all hover:bg-neutral-200 hover:text-neutral-700 dark:bg-neutral-800 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
                         aria-label="Edit agent"
                         title="Edit agent"
                       >
@@ -5406,7 +5403,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       <button
                         type="button"
                         onClick={() => setTeam((prev) => [...prev, { ...member, status: 'available' }])}
-                        className="absolute right-2.5 top-2.5 z-10 flex size-7 items-center justify-center rounded-full bg-orange-50 dark:bg-orange-900/20 text-orange-500 transition-all hover:bg-orange-100 dark:hover:bg-orange-900/40"
+                        className="absolute right-2.5 top-2.5 z-10 flex size-11 items-center justify-center rounded-full bg-orange-50 text-orange-500 transition-all hover:bg-orange-100 dark:bg-orange-900/20 dark:hover:bg-orange-900/40"
                         aria-label="Add to active team"
                         title="Add to active team"
                       >
@@ -5423,7 +5420,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         {getModelDisplayLabelFromLookup(member.modelId, gatewayModelLabelById)}
                       </span>
                       {member.roleDescription ? (
-                        <p className="mt-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-1">{member.roleDescription}</p>
+                        <p className="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400 line-clamp-1">{member.roleDescription}</p>
                       ) : null}
                       <div className="mt-3 w-full rounded-lg border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 px-2.5 py-2 text-left">
                         {hasPrompt ? (
@@ -5587,7 +5584,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <button
                     type="button"
                     onClick={() => setShowAddTeamModal(true)}
-                    className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
+                    className="flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-accent-600 transition-colors"
                   >
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
                     New Team
@@ -5607,7 +5604,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       const teamColors = ['border-blue-300', 'border-emerald-300', 'border-violet-300', 'border-amber-300', 'border-pink-300', 'border-teal-300']
                       return (
                         <div key={config.id} className={cn('relative rounded-xl border-2 bg-white dark:bg-neutral-900 shadow-sm transition-all hover:shadow-md', isActive ? 'border-orange-400' : teamColors[tIdx % teamColors.length])}>
-                          {isActive ? <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-orange-500 px-2 py-0.5 text-[9px] font-bold text-white shadow-sm">Active</span> : null}
+                          {isActive ? <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-accent-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">Active</span> : null}
                           <button type="button" onClick={() => setTeamWizardOpenId(config.id)}
                             className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-700 transition-all" title="Edit team">
                             <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M7 1.5l1.5 1.5L3 8.5H1.5V7L7 1.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -5617,8 +5614,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             <p className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">{config.name}</p>
                             <p className="mt-0.5 text-[10px] text-neutral-400">{config.team.length} agents</p>
                             <div className="mt-2 flex flex-wrap justify-center gap-1">
-                              {config.team.slice(0, 3).map((m) => <span key={m.id} className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-500 dark:text-neutral-400">{m.name}</span>)}
-                              {config.team.length > 3 ? <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-400">+{config.team.length - 3}</span> : null}
+                              {config.team.slice(0, 3).map((m) => <span key={m.id} className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-500 dark:text-neutral-400">{m.name}</span>)}
+                              {config.team.length > 3 ? <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-400">+{config.team.length - 3}</span> : null}
                             </div>
                           </div>
                           <div className="border-t border-neutral-100 dark:border-neutral-800 flex">
@@ -5734,15 +5731,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <div className="flex items-center justify-between px-6 py-5 border-b border-neutral-100 dark:border-neutral-800 border-l-4 border-l-orange-400">
                   <div>
                     <h2 className="text-base font-bold text-neutral-900 dark:text-white">Add Provider</h2>
-                    <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                    <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                       {providerWizardStep === 'select' ? 'Step 1 — Choose a provider' : `Step 2 — Enter your ${providerWizardSelected || addProviderName} API key`}
                     </p>
                   </div>
                   {/* Step indicator + close */}
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1.5">
-                      <span className={cn('size-2 rounded-full', providerWizardStep === 'select' ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
-                      <span className={cn('size-2 rounded-full', providerWizardStep === 'key' ? 'bg-orange-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+                      <span className={cn('size-2 rounded-full', providerWizardStep === 'select' ? 'bg-accent-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
+                      <span className={cn('size-2 rounded-full', providerWizardStep === 'key' ? 'bg-accent-500' : 'bg-neutral-300 dark:bg-neutral-600')} />
                     </div>
                     <button type="button" onClick={() => { setShowAddProviderModal(false); setProviderWizardStep('select'); setProviderWizardSelected(''); setAddProviderApiKey(''); setAddProviderBaseUrl(''); setAddProviderApiType('openai-completions'); setProviderTestStatus('idle'); setProviderTestError('') }}
                       className="flex size-7 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:text-neutral-700 dark:hover:text-white transition-colors">
@@ -5809,7 +5806,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <button
                       type="button"
                       onClick={() => { setProviderWizardStep('select'); setAddProviderApiKey(''); setAddProviderBaseUrl(''); setAddProviderApiType('openai-completions'); setProviderTestStatus('idle'); setProviderTestError('') }}
-                      className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
+                      className="flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
                     >
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7 2L3 6l4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       Back
@@ -5889,13 +5886,13 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         {providerTestStatus === 'testing' ? 'Testing…' : 'Test Connection'}
                       </button>
                       {providerTestStatus === 'ok' ? (
-                        <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                        <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1.5 6.5L4.5 9.5L10.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
                           Connected ✓
                         </span>
                       ) : null}
                       {providerTestStatus === 'error' ? (
-                        <span className="text-[11px] font-medium text-red-500 dark:text-red-400" title={providerTestError}>
+                        <span className="text-xs font-medium text-red-500 dark:text-red-400" title={providerTestError}>
                           ✗ {providerTestError.length > 40 ? `${providerTestError.slice(0, 40)}…` : providerTestError}
                         </span>
                       ) : null}
@@ -5938,7 +5935,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         })
                       }}
                       disabled={isAddingProvider || !addProviderApiKey.trim() || !addProviderName.trim()}
-                      className="w-full rounded-lg bg-orange-500 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full rounded-lg bg-accent-500 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isAddingProvider ? 'Adding…' : `Connect ${addProviderName || 'Provider'}`}
                     </button>
@@ -5951,12 +5948,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <div className="flex items-center justify-between mb-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
                   <div>
                     <h2 className="text-base font-bold text-neutral-900 dark:text-white">Connected Providers</h2>
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{configuredProviders.length} active · {gatewayModels.length} models available</p>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">{configuredProviders.length} active · {gatewayModels.length} models available</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => { setProviderWizardStep('select'); setProviderWizardSelected(''); setAddProviderApiKey(''); setAddProviderBaseUrl(''); setAddProviderApiType('openai-completions'); setAddProviderName(''); setShowAddProviderModal(true) }}
-                    className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors"
+                    className="flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-accent-600 transition-colors"
                   >
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
                     Add Provider
@@ -5986,7 +5983,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                               <ProviderLogo provider={provider} size={28} />
                             </div>
                             <p className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">{pm.label}</p>
-                            <p className="text-[9px] text-neutral-400 mt-0.5">{pm.description}</p>
+                            <p className="text-[10px] text-neutral-400 mt-0.5">{pm.description}</p>
                             <div className="mt-1 flex items-center gap-1">
                               <span className="size-1.5 rounded-full bg-emerald-500" />
                               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Active</span>
@@ -5997,9 +5994,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             {providerModels.length > 0 ? (
                               <div className="mt-2 w-full space-y-0.5">
                                 {providerModels.slice(0, 3).map((m) => (
-                                  <span key={m.value} className="block truncate rounded bg-neutral-50 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-500 dark:text-neutral-400">{m.label}</span>
+                                  <span key={m.value} className="block truncate rounded bg-neutral-50 dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-500 dark:text-neutral-400">{m.label}</span>
                                 ))}
-                                {providerModels.length > 3 ? <span className="block text-[9px] text-neutral-400 text-center">+{providerModels.length - 3} more</span> : null}
+                                {providerModels.length > 3 ? <span className="block text-[10px] text-neutral-400 text-center">+{providerModels.length - 3} more</span> : null}
                               </div>
                             ) : null}
                           </div>
@@ -6193,14 +6190,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
 	    const missionCardCls = 'relative overflow-hidden rounded-xl border border-primary-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-800 px-4 py-3'
 	    return (
-	      <div className="relative flex h-full min-h-0 flex-col bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)]">
+	      <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)]">
 	        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
 	        <div className="relative mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col gap-3 p-3 pb-24 sm:gap-4 sm:p-4 sm:pb-4">
 	          {/* ── Header ──────────────────────────────────────────────────── */}
           <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
             <div>
               {/* Mobile: short label; Desktop: full title + description */}
-              <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-100 md:text-lg">
+              <h2 className={HUB_PAGE_TITLE_CLASS}>
                 <span className="md:hidden">Missions</span>
                 <span className="hidden md:inline">Mission Control</span>
               </h2>
@@ -6210,7 +6207,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <button
                 type="button"
                 onClick={() => openNewMissionModal()}
-                className="rounded-lg bg-accent-500 text-white px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-semibold hover:bg-accent-600 transition-colors"
+                className={HUB_PRIMARY_BUTTON_CLASS}
               >
                 + New Mission
               </button>
@@ -6253,7 +6250,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     {tab.label}
                     {tab.count > 0 && (
                       <span className={cn(
-                        'inline-flex min-w-[16px] items-center justify-center rounded-full px-1 py-0.5 text-[9px] sm:text-[10px] font-bold leading-none',
+                        'inline-flex min-w-[16px] items-center justify-center rounded-full px-1 py-0.5 text-[10px] sm:text-[10px] font-bold leading-none',
                         isActive
                           ? 'bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-400'
                           : 'bg-neutral-200 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400',
@@ -6289,7 +6286,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <button
                       type="button"
                       onClick={() => openNewMissionModal()}
-                      className="mt-3 rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-600 transition-colors"
+                    className={cn('mt-3', HUB_PRIMARY_BUTTON_CLASS)}
                     >
                       + New Mission
                     </button>
@@ -6341,7 +6338,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{entry.title}</p>
                             {/* Short ID hidden on mobile */}
-                            <span className="hidden sm:inline shrink-0 rounded bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[9px] font-mono text-neutral-400 dark:text-neutral-500">
+                            <span className="hidden sm:inline shrink-0 rounded bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] font-mono text-neutral-400 dark:text-neutral-500">
                               #{entry.id.slice(-6)}
                             </span>
                           </div>
@@ -6375,7 +6372,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         <span className="shrink-0 text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">{entry.duration}</span>
 
                         {/* Started At — hidden on mobile */}
-                        <span className="hidden md:block shrink-0 text-[11px] text-neutral-400 dark:text-neutral-500">{timeAgoFromMs(entry.startedAt)}</span>
+                        <span className="hidden md:block shrink-0 text-xs text-neutral-400 dark:text-neutral-500">{timeAgoFromMs(entry.startedAt)}</span>
 
                         {/* Action */}
                         <div className="shrink-0">
@@ -6387,7 +6384,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                 setOutputPanelVisible(true)
                                 if (!selectedOutputAgentId && team.length > 0) setSelectedOutputAgentId(team[0].id)
                               }}
-                              className="rounded-lg border border-primary-200 bg-white text-primary-700 px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm font-medium hover:bg-neutral-50 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                              className={HUB_SECONDARY_BUTTON_CLASS}
                             >
                               <span className="hidden sm:inline">Live Output ↗</span>
                               <span className="sm:hidden">Live ↗</span>
@@ -6396,7 +6393,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setSelectedReport(entry.report!) }}
-                              className="rounded-lg border border-primary-200 bg-white text-primary-700 px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm font-medium hover:bg-neutral-50 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                              className={HUB_SECONDARY_BUTTON_CLASS}
                             >
                               <span className="hidden sm:inline">View Report</span>
                               <span className="sm:hidden">View</span>
@@ -6405,7 +6402,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); openNewMissionModal({ name: `Rerun: ${entry.title}`, goal: entry.goal }) }}
-                              className="rounded-lg border border-primary-200 bg-white text-primary-700 px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm font-medium hover:bg-neutral-50 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                              className={HUB_SECONDARY_BUTTON_CLASS}
                             >
                               Re-run
                             </button>
@@ -6422,7 +6419,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                               <div className="h-2.5 rounded-full bg-accent-500 transition-all duration-500 ease-out" style={{ width: `${Math.max(4, runningProgressPct)}%` }} />
                             </div>
                             <span className="shrink-0 text-xs font-semibold text-neutral-700 dark:text-neutral-300 tabular-nums">{runningProgressPct}%</span>
-                            <span className="shrink-0 text-[11px] text-neutral-500 dark:text-neutral-400 tabular-nums">{runningTaskStats.completed}/{runningTaskStats.total}</span>
+                            <span className="shrink-0 text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">{runningTaskStats.completed}/{runningTaskStats.total}</span>
                           </div>
 
                           {/* Agent status rows */}
@@ -6435,7 +6432,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                 <div key={row.id} className="flex items-center gap-2 px-3 py-2">
                                   <span className={cn('size-2 shrink-0 rounded-full', statusMeta.dotClassName, statusMeta.pulse && 'animate-pulse')} />
                                   <span className="text-xs font-semibold text-neutral-900 dark:text-white shrink-0">{row.name}</span>
-                                  <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold', statusMeta.className)}>
+                                  <span className={cn('shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold', statusMeta.className)}>
                                     {statusMeta.label}
                                   </span>
                                   {lastOutput !== 'Agent working...' ? (
@@ -6452,7 +6449,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                         setSteerAgentId(row.id)
                                         setSteerInput('')
                                       }}
-                                      className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800/50 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-colors"
+                                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800/50 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-colors"
                                       title={`Send directive to ${row.name}`}
                                     >
                                       ✦ Steer
@@ -6469,7 +6466,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                               type="button"
                               onClick={(e) => { e.stopPropagation(); void handleMissionPause(false) }}
                               disabled={missionState === 'running'}
-                              className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 bg-emerald-600 text-white hover:bg-emerald-700"
+                              className="min-h-11 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-40"
                             >
                               ▶ Resume
                             </button>
@@ -6477,7 +6474,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                               type="button"
                               onClick={(e) => { e.stopPropagation(); void handleMissionPause(true) }}
                               disabled={missionState === 'paused'}
-                              className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 bg-amber-500 text-white hover:bg-amber-600"
+                              className="min-h-11 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-600 disabled:opacity-40"
                             >
                               ⏸ Pause
                             </button>
@@ -6496,7 +6493,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                     toast('No active agent to steer', { type: 'warning' })
                                   }
                                 }}
-                                className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors bg-violet-500 text-white hover:bg-violet-600"
+                                className="min-h-11 rounded-md bg-violet-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-600"
                               >
                                 ✦ Steer
                               </button>
@@ -6504,7 +6501,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); stopMissionAndCleanup('aborted') }}
-                              className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors bg-red-600 text-white hover:bg-red-700"
+                              className="min-h-11 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700"
                             >
                               ■ Stop
                             </button>
@@ -6516,7 +6513,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                                 setOutputPanelVisible(true)
                                 if (!selectedOutputAgentId && team.length > 0) setSelectedOutputAgentId(team[0].id)
                               }}
-                              className="rounded-lg border border-primary-200 bg-white text-primary-700 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 transition-colors dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                              className={HUB_SECONDARY_BUTTON_CLASS}
                             >
                               Live Output ↗
                             </button>
@@ -6541,7 +6538,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <p className="text-sm font-bold text-neutral-900 dark:text-white">Steer Agent</p>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">{steerMember?.name ?? steerAgentId}</p>
                 </div>
-                <button type="button" onClick={() => setSteerAgentId(null)} className="flex size-7 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">✕</button>
+                <button type="button" onClick={() => setSteerAgentId(null)} className="flex size-11 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200">✕</button>
               </div>
               <textarea
                 value={steerInput}
@@ -6557,12 +6554,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 }}
               />
               <div className="mt-3 flex justify-end gap-2">
-                <button type="button" onClick={() => setSteerAgentId(null)} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50">Cancel</button>
+                <button type="button" onClick={() => setSteerAgentId(null)} className={HUB_SECONDARY_BUTTON_CLASS}>Cancel</button>
                 <button
                   type="button"
                   disabled={!steerInput.trim()}
                   onClick={() => void handleSteerAgent(steerAgentId, steerInput)}
-                  className="rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
+                  className={cn(HUB_PRIMARY_BUTTON_CLASS, 'disabled:opacity-50')}
                 >
                   Send Directive ⌘↵
                 </button>
@@ -6662,7 +6659,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             <button
                               type="button"
                               onClick={() => { setSelectedOutputAgentId(row.id); setOutputPanelVisible(true); setMaximizedMissionId(null) }}
-                              className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors"
+                              className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors"
                             >
                               View Output
                             </button>
@@ -6705,7 +6702,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 {isRunning && (
                   <div>
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Latest Output</p>
-                    <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 p-4 font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-slate-300 max-h-48 overflow-y-auto space-y-1">
+                    <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 p-4 font-mono text-xs leading-relaxed text-neutral-700 dark:text-slate-300 max-h-48 overflow-y-auto space-y-1">
                       {agentWorkingRows.flatMap((row) =>
                         (agentOutputLinesRef.current[row.id] ?? []).slice(-4).map((line, idx) => (
                           <p key={`${row.id}-${idx}`}>
@@ -6723,7 +6720,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400">Artifacts ({artifacts.length})</p>
                     <div className="flex flex-wrap gap-2">
                       {artifacts.slice(0, 10).map((a) => (
-                        <span key={a.id} className="rounded-full border border-neutral-200 bg-white dark:bg-slate-800 px-3 py-1 text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+                        <span key={a.id} className="rounded-full border border-neutral-200 bg-white dark:bg-slate-800 px-3 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300">
                           {a.title}
                         </span>
                       ))}
@@ -6753,7 +6750,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     <button
                       type="button"
                       onClick={() => setMaximizedMissionId(null)}
-                      className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
+                      className={HUB_SECONDARY_BUTTON_CLASS}
                     >
                       Close
                     </button>
@@ -6770,7 +6767,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   return (
     <AgentHubErrorBoundary>
-    <div className="flex h-full min-h-0 flex-col bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)]">
+    <div className="flex h-full min-h-0 flex-col overflow-x-hidden bg-primary-100/45 dark:bg-[var(--theme-bg,#0b0e14)]">
       {/* ── Header — matches dashboard card style ─────────────────────────── */}
       <div className="shrink-0 px-3 pt-3 sm:px-4 sm:pt-4">
         <div className="mx-auto w-full max-w-[1600px]">
@@ -6781,7 +6778,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-orange-500 via-orange-400 to-amber-400" />
             <div className="flex items-center justify-between gap-4">
               <div className="flex min-w-0 items-baseline gap-2">
-                <h1 className="shrink-0 text-sm font-semibold text-ink dark:text-white md:text-base">Agent Hub</h1>
+                <h1 className="shrink-0 text-lg font-bold text-ink dark:text-white md:text-xl">Agent Hub</h1>
                 <p className="truncate font-mono text-[10px] text-neutral-500 dark:text-slate-500">// Mission Control</p>
               </div>
               <div className="flex items-center gap-2">
@@ -6811,7 +6808,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'relative flex min-w-[80px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-sm font-medium transition-all sm:min-w-[108px] sm:gap-1.5 sm:px-3 sm:py-2',
+                'relative flex min-h-11 min-w-[80px] flex-1 items-center justify-center gap-1 px-2 py-1.5 text-sm font-semibold transition-all sm:min-w-[108px] sm:gap-1.5 sm:px-3 sm:py-2',
                 isActive
                   ? 'bg-white text-neutral-900 shadow-sm dark:bg-slate-700 dark:text-white'
                   : 'text-neutral-500 hover:bg-white hover:text-neutral-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white',
@@ -6819,7 +6816,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             >
               {/* Active tab: orange bottom highlight */}
               {isActive ? (
-                <span className="absolute inset-x-0 bottom-0 h-[2px] bg-orange-500" />
+                <span className="absolute inset-x-0 bottom-0 h-[2px] bg-accent-500" />
               ) : null}
               <span aria-hidden className="text-sm leading-none sm:text-base">{tab.icon}</span>
               <span className="shrink-0 whitespace-nowrap">{tab.label}</span>
@@ -6831,7 +6828,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 </span>
               ) : null}
               {tab.id === 'configure' && pendingApprovals > 0 ? (
-                <span className="ml-0.5 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
+                <span className="ml-0.5 rounded-full bg-accent-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
                   {pendingApprovals > 99 ? '99+' : pendingApprovals}
                 </span>
               ) : null}
@@ -6846,7 +6843,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
       {/* ── Main content ──────────────────────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* ── Tab content area ── */}
-        <div className="min-w-0 flex-1 overflow-hidden pb-[calc(var(--tabbar-h,80px)+1rem)] md:pb-0">
+        <div className="min-w-0 flex-1 overflow-hidden pb-24 sm:pb-4">
           {activeTab === 'overview' && (
             <div className="h-full min-h-0">
               {renderOverviewContent()}
@@ -6885,7 +6882,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     </p>
                     {selectedOutputStatusLabel && (
                       <span className={cn(
-                        'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
+                        'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
                         selectedOutputStatusLabel === 'Active' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
                         selectedOutputStatusLabel === 'Idle' && 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400',
                         selectedOutputStatusLabel === 'Waiting For Input' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
@@ -6979,7 +6976,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   <button
                     type="button"
                     onClick={() => { setMissionBoardModalOpen(false); setMissionWizardStep(0) }}
-                    className="rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1 text-[11px] text-neutral-600 hover:bg-neutral-50"
+                    className="rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-50"
                   >
                     ✕
                   </button>
@@ -6991,7 +6988,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         type="button"
                         onClick={() => setMissionWizardStep(stepIdx)}
                         className={cn(
-                          'flex size-7 items-center justify-center rounded-full text-[11px] font-semibold transition-colors',
+                          'flex size-7 items-center justify-center rounded-full text-xs font-semibold transition-colors',
                           stepIdx === missionWizardStep
                             ? 'bg-accent-500 text-white'
                             : stepIdx < missionWizardStep
@@ -7002,7 +6999,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         {stepIdx < missionWizardStep ? '✓' : stepIdx + 1}
                       </button>
                       <span className={cn(
-                        'text-[11px] font-medium',
+                        'text-xs font-medium',
                         stepIdx === missionWizardStep ? 'text-neutral-900 dark:text-white' : 'text-neutral-400',
                       )}>
                         {stepLabel}
@@ -7055,14 +7052,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             className={cn(
                               'w-full rounded-xl border p-3 text-left transition-colors',
                               newMissionTeamConfigId === option.id
-                                ? 'border-accent-300 bg-accent-50/70'
-                                : 'border-neutral-200 bg-white hover:border-neutral-300',
+                                ? 'border-accent-300 bg-accent-50/70 dark:border-accent-800 dark:bg-accent-950/30'
+                                : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:border-neutral-600',
                             )}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{option.label}</p>
-                                <p className="mt-0.5 text-[11px] text-neutral-500 dark:text-slate-400">
+                                <p className="mt-0.5 text-xs text-neutral-500 dark:text-slate-400">
                                   {option.team.length} agents
                                   {teamBudget.avgCost !== null ? ` · ~$${teamBudget.avgCost.toFixed(2)}/agent` : ''}
                                 </p>
@@ -7101,8 +7098,8 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             className={cn(
                               'rounded-lg border px-3 py-3 text-center transition-colors',
                               newMissionProcessType === pt
-                                ? 'border-accent-300 bg-accent-50 text-accent-700'
-                                : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300',
+                                ? 'border-accent-300 bg-accent-50 text-accent-700 dark:border-accent-800 dark:bg-accent-950/30 dark:text-accent-300'
+                                : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600',
                             )}
                           >
                             <p className="text-xs font-semibold capitalize">{pt}</p>
@@ -7122,7 +7119,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                         placeholder="120000"
                         className="mt-1.5 h-10 w-full rounded-lg border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 text-sm text-neutral-900 outline-none ring-accent-400 focus:ring-1"
                       />
-                      <p className="mt-1 text-[11px] text-neutral-400">
+                      <p className="mt-1 text-xs text-neutral-400">
                         {_modalSelectedBudgetTokens ? `~$${(_modalSelectedTotalBudgetCost ?? 0).toFixed(2)} estimated cost` : 'No budget limit'}
                       </p>
                     </label>
@@ -7233,21 +7230,21 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                 <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">
                   Launch Mission
                 </h2>
-                <p className="text-[11px] text-neutral-500 dark:text-slate-400">
+                <p className="text-xs text-neutral-500 dark:text-slate-400">
                   Step {wizardStepIndex + 1} of {WIZARD_STEP_ORDER.length}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={closeLaunchWizard}
-                className="rounded-md border border-neutral-200 px-2 py-1 text-[11px] font-medium text-neutral-600 transition-colors hover:bg-neutral-50"
+                className="rounded-md border border-neutral-200 px-2 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-50"
               >
                 Cancel
               </button>
             </div>
 
             <div className="border-b border-neutral-200 px-5 py-2.5">
-              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
                 {WIZARD_STEP_ORDER.map((step, index) => {
                   const label =
                     step === 'gateway'
@@ -7270,7 +7267,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           ? 'border-accent-400 bg-accent-50 text-accent-700'
                           : completed
                             ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                            : 'border-neutral-200 bg-white text-neutral-500',
+                            : 'border-neutral-200 bg-white text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
                       )}
                     >
                       {index + 1}. {label}
@@ -7321,7 +7318,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                             })
                             .finally(() => setWizardCheckingGateway(false))
                         }}
-                        className="rounded-md border border-neutral-200 px-2 py-1 text-[11px] font-medium text-neutral-600 transition-colors hover:bg-neutral-50"
+                        className="rounded-md border border-neutral-200 px-2 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-50"
                       >
                         Refresh
                       </button>
@@ -7350,7 +7347,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     )}
                     <a
                       href="/settings/providers"
-                      className="mt-3 inline-block text-[11px] font-medium text-accent-600 hover:text-accent-700"
+                      className="mt-3 inline-block text-xs font-medium text-accent-600 hover:text-accent-700"
                     >
                       Manage API keys →
                     </a>
@@ -7380,7 +7377,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           <p className="font-semibold">
                             {template.icon} {template.name}
                           </p>
-                          <p className="mt-1 text-[11px] opacity-80">
+                          <p className="mt-1 text-xs opacity-80">
                             {template.agents.length} agents
                           </p>
                         </button>
@@ -7429,7 +7426,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           key={example.label}
                           type="button"
                           onClick={() => setMissionGoal(example.text)}
-                          className="rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-[11px] text-neutral-600 transition-colors hover:border-accent-400 hover:text-accent-700"
+                          className="rounded-full border border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-xs text-neutral-600 transition-colors hover:border-accent-400 hover:text-accent-700"
                         >
                           {example.label}
                         </button>
@@ -7454,10 +7451,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                           type="button"
                           onClick={() => setProcessType(option.id)}
                           className={cn(
-                            'rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors',
+                            'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
                             processType === option.id
                               ? 'border-accent-400 bg-accent-50 text-accent-700'
-                              : 'border-neutral-200 bg-white text-neutral-600',
+                              : 'border-neutral-200 bg-white text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
                           )}
                         >
                           {option.label}
@@ -7465,7 +7462,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       ))}
                     </div>
                     {suggestedTemplateName ? (
-                      <p className="mt-2 text-[11px] text-neutral-500 dark:text-slate-400">
+                      <p className="mt-2 text-xs text-neutral-500 dark:text-slate-400">
                         Suggested template: <span className="font-semibold">{suggestedTemplateName}</span>
                       </p>
                     ) : null}
@@ -7473,7 +7470,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       type="button"
                       onClick={handleAutoConfigure}
                       disabled={missionGoal.trim().length === 0}
-                      className="mt-2 rounded-md border border-accent-400 px-2.5 py-1 text-[11px] font-medium text-accent-600 transition-colors hover:bg-accent-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="mt-2 rounded-md border border-accent-400 px-2.5 py-1 text-xs font-medium text-accent-600 transition-colors hover:bg-accent-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Auto-configure team from goal
                     </button>
@@ -7521,7 +7518,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   setWizardStepIndex((prev) => Math.max(0, prev - 1))
                 }
                 disabled={wizardStepIndex === 0}
-                className="rounded-md border border-neutral-200 px-3 py-1.5 text-[11px] font-medium text-neutral-600 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-md border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Back
               </button>
@@ -7538,7 +7535,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                       (gatewayStatus === 'disconnected' || wizardCheckingGateway)) ||
                     (wizardStep === 'goal' && missionGoal.trim().length === 0)
                   }
-                  className="rounded-md bg-accent-500 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-md bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Next
                 </button>
@@ -7547,7 +7544,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   type="button"
                   onClick={handleCreateMission}
                   disabled={missionGoal.trim().length === 0 || dispatchingRef.current || missionActive}
-                  className="rounded-md bg-accent-500 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-md bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Launch Mission
                 </button>
@@ -7568,14 +7565,14 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-neutral-50 dark:bg-slate-800/50 px-4 py-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">{artifactPreview.title}</p>
-                <p className="text-[11px] text-neutral-500 dark:text-slate-400">
+                <p className="text-xs text-neutral-500 dark:text-slate-400">
                   {artifactPreview.agentName} · {artifactPreview.type} · {new Date(artifactPreview.timestamp).toLocaleString()}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setArtifactPreview(null)}
-                className="rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1 text-[11px] font-medium text-neutral-700"
+                className="rounded-md border border-neutral-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-2 py-1 text-xs font-medium text-neutral-700"
               >
                 Close
               </button>
@@ -7605,15 +7602,15 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             aria-hidden
           />
           {/* Sheet */}
-          <div className="relative flex max-h-[90vh] flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl">
-            <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 p-3">
+          <div className="relative flex max-h-[90vh] flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl dark:bg-slate-900">
+            <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 p-3 dark:border-neutral-700">
               <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
                 {selectedOutputAgentName} Output
               </h3>
               <button
                 type="button"
                 onClick={() => setOutputPanelVisible(false)}
-                className="flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+                className="flex size-11 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
                 aria-label="Close agent output"
               >
                 ✕
@@ -7689,9 +7686,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400 mb-2">Agents Used</p>
               <div className="flex flex-wrap gap-1.5">
                 {completionReport.agents.map((agent) => (
-                  <span key={agent.id} className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+                  <span key={agent.id} className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300">
                     {agent.name}
-                    <span className="text-[9px] text-neutral-400">· {getModelDisplayLabel(agent.modelId)}</span>
+                    <span className="text-[10px] text-neutral-400">· {getModelDisplayLabel(agent.modelId)}</span>
                   </span>
                 ))}
               </div>
@@ -7773,9 +7770,9 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-slate-400 mb-2">Agents</p>
               <div className="flex flex-wrap gap-1.5">
                 {selectedReport.agents.map((agent) => (
-                  <span key={agent.id} className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+                  <span key={agent.id} className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300">
                     {agent.name}
-                    <span className="text-[9px] text-neutral-400">· {getModelDisplayLabel(agent.modelId)}</span>
+                    <span className="text-[10px] text-neutral-400">· {getModelDisplayLabel(agent.modelId)}</span>
                   </span>
                 ))}
               </div>
@@ -7790,7 +7787,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     key={a.id}
                     type="button"
                     onClick={() => setArtifactPreview(a)}
-                    className="inline-flex items-center gap-1 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 hover:border-accent-300 transition-colors"
+                    className="inline-flex items-center gap-1 rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-slate-800/50 px-2.5 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-accent-300 transition-colors"
                   >
                     {a.type === 'code' ? '📄' : a.type === 'html' ? '🌐' : '📝'} {a.title}
                   </button>

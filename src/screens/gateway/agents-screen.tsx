@@ -868,14 +868,14 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                   agentHubPullDistance >= agentHubThreshold ? 'border-t-transparent animate-spin' : 'opacity-50',
                 ].join(' ')}
               />
-              <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-300">
+              <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
                 {agentHubPullDistance >= agentHubThreshold ? 'Release to refresh' : 'Pull to refresh'}
               </span>
             </div>
           </div>
         ) : null}
         {usingFallbackRegistry ? (
-          <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
+          <div className="border-b border-amber-300/50 bg-amber-50/70 px-6 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
             Gateway registry unavailable. Showing fallback definitions.
           </div>
         ) : null}
@@ -887,11 +887,11 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
   }
 
   return (
-    <div className="min-h-full bg-surface px-4 pt-5 pb-24 text-primary-900 dark:text-neutral-100 md:px-6 md:pt-8">
+    <div className="min-h-full bg-surface px-4 pb-24 pt-5 text-primary-900 dark:text-neutral-100 md:px-6 md:pb-4 md:pt-8">
       <div className="mx-auto w-full max-w-[1200px]">
         <header className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/80 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
           <div>
-            <h1 className="text-base font-semibold text-primary-900 dark:text-neutral-100">
+            <h1 className="text-lg font-bold text-primary-900 dark:text-neutral-100 md:text-xl">
               Gateway Agents
             </h1>
             <p className="text-xs text-primary-500 dark:text-neutral-400">
@@ -916,7 +916,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
         </header>
 
         {usingFallbackRegistry ? (
-          <div className="mb-4 rounded-xl border border-amber-300/50 bg-amber-50/70 px-3 py-2 text-[11px] font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
+          <div className="mb-4 rounded-xl border border-amber-300/50 bg-amber-50/70 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-200">
             Gateway registry unavailable. Showing fallback definitions.
           </div>
         ) : null}
@@ -944,7 +944,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                 onClick={() => {
                   void navigate({ to: '/settings' })
                 }}
-                className="mt-4 inline-flex h-9 items-center rounded-xl bg-accent-500 px-4 text-sm font-medium text-white shadow-sm hover:bg-accent-600"
+                className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-600 sm:px-4 sm:py-2 sm:text-sm"
               >
                 Open Settings
               </button>
@@ -954,7 +954,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
               {groupedSections.map((section) => (
                 <section key={section.category} className="space-y-2">
                   <div className="flex items-center justify-between px-1">
-                    <h2 className="text-xs font-semibold tracking-wide text-neutral-500 dark:text-neutral-400">
+                    <h2 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-neutral-400">
                       {section.category}
                     </h2>
                     <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
@@ -994,12 +994,12 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
 
           <div className="absolute inset-x-4 top-[12vh] rounded-2xl border border-white/30 bg-white/90 p-4 shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-neutral-900/90">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+              <h3 className="truncate pr-2 text-base font-bold text-neutral-900 dark:text-neutral-100">
                 {selectedHistoryAgent.name} history
               </h3>
               <button
                 type="button"
-                className="rounded-lg px-2 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                className="min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 sm:px-4 sm:py-2 sm:text-sm"
                 onClick={() => setHistoryAgentId(null)}
               >
                 Close
@@ -1042,7 +1042,7 @@ export function AgentsScreen({ variant = 'mission-control' }: AgentsScreenProps)
                                 params: { sessionKey: friendlyId },
                               })
                             }}
-                            className="rounded-lg px-2 py-1 text-[10px] font-medium text-accent-700 hover:bg-accent-50 dark:text-accent-300 dark:hover:bg-accent-950/30"
+                            className="min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-accent-700 transition-colors hover:bg-accent-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-accent-300 dark:hover:bg-accent-950/30 sm:px-4 sm:py-2 sm:text-sm"
                           >
                             Open Chat
                           </button>
