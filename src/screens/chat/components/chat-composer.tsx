@@ -8,7 +8,6 @@ import {
   Delete01Icon,
   Mic01Icon,
   PinIcon,
-  Search01Icon,
   StopIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -532,7 +531,7 @@ function ChatComposerComponent({
   composerRef,
   focusKey,
   onNewSession,
-  onToggleWebSearch,
+  onToggleWebSearch: _onToggleWebSearch,
   webSearchEnabled,
 }: ChatComposerProps) {
   const mobileKeyboardInset = useWorkspaceStore((s) => s.mobileKeyboardInset)
@@ -559,7 +558,7 @@ function ChatComposerComponent({
   })
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
   const [isMobileActionsMenuOpen, setIsMobileActionsMenuOpen] = useState(false)
-  const [isWebSearchMode, setIsWebSearchMode] = useState(false)
+  const [isWebSearchMode, _setIsWebSearchMode] = useState(false)
   const [isSlashMenuDismissed, setIsSlashMenuDismissed] = useState(false)
   const [modelNotice, setModelNotice] = useState<ModelSwitchNotice | null>(null)
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
@@ -1203,16 +1202,8 @@ function ChatComposerComponent({
     reset()
   }, [reset])
 
-  const isWebSearchActive = webSearchEnabled ?? isWebSearchMode
-
-  const handleToggleWebSearch = useCallback(() => {
-    const nextEnabled = !isWebSearchActive
-    if (onToggleWebSearch) {
-      onToggleWebSearch(nextEnabled)
-    } else {
-      setIsWebSearchMode(nextEnabled)
-    }
-  }, [isWebSearchActive, onToggleWebSearch])
+  const _isWebSearchActive = webSearchEnabled ?? isWebSearchMode
+  void _isWebSearchActive // retained for future use / external prop
 
   // Voice input (tap = speech-to-text)
   const voiceInput = useVoiceInput({
@@ -1659,8 +1650,10 @@ function ChatComposerComponent({
         ) : null}
 
         {isMobileViewport ? (
+          /* ── Mobile: Telegram-style single-row bar ── */
           <>
-            <div className="flex items-end gap-2 px-3 py-2">
+            <div className="flex items-center gap-2 px-3 py-2">
+              {/* + button — opens bottom sheet actions menu */}
               <button
                 type="button"
                 aria-label="Actions"
@@ -1670,36 +1663,36 @@ function ChatComposerComponent({
                   setIsModelMenuOpen(false)
                   setIsMobileActionsMenuOpen((prev) => !prev)
                 }}
-                className="mb-0.5 size-10 shrink-0 rounded-full border border-neutral-200 bg-white shadow-sm flex items-center justify-center transition-colors active:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:active:bg-neutral-800"
+                className="size-8 shrink-0 rounded-full bg-neutral-100 dark:bg-white/10 flex items-center justify-center text-primary-600 active:bg-neutral-200 dark:active:bg-white/20 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={1.5} />
               </button>
 
-              <div className="flex-1 rounded-3xl border border-neutral-200 bg-white px-3 dark:border-neutral-700 dark:bg-neutral-900">
-                <PromptInputTextarea
-                  placeholder={promptPlaceholder}
-                  autoFocus
-                  inputRef={promptRef}
-                  onKeyDown={handlePromptKeyDown}
-                  onFocus={() => {
-                    setMobileComposerFocused(true)
-                    if (!window.visualViewport) {
-                      setMobileKeyboardOpen(true)
-                      setMobileKeyboardInset(0)
-                    }
-                  }}
-                  onBlur={() => {
-                    setMobileComposerFocused(false)
-                    if (!window.visualViewport) {
-                      setMobileKeyboardOpen(false)
-                      setMobileKeyboardInset(0)
-                    }
-                  }}
-                  className="min-h-[36px] max-h-[120px] flex-1 text-base leading-snug !px-0 !py-2"
-                />
-              </div>
+              {/* Textarea — flex-1, auto-growing */}
+              <PromptInputTextarea
+                placeholder={promptPlaceholder}
+                autoFocus
+                inputRef={promptRef}
+                onKeyDown={handlePromptKeyDown}
+                onFocus={() => {
+                  setMobileComposerFocused(true)
+                  if (!window.visualViewport) {
+                    setMobileKeyboardOpen(true)
+                    setMobileKeyboardInset(0)
+                  }
+                }}
+                onBlur={() => {
+                  setMobileComposerFocused(false)
+                  if (!window.visualViewport) {
+                    setMobileKeyboardOpen(false)
+                    setMobileKeyboardInset(0)
+                  }
+                }}
+                className="min-h-[36px] max-h-[120px] flex-1 text-base leading-snug"
+              />
 
-              <div className="mb-0.5 shrink-0">
+              {/* Right side: stop / send / mic */}
+              <div className="shrink-0">
                 {isLoading ? (
                   <button
                     type="button"
@@ -1832,28 +1825,19 @@ function ChatComposerComponent({
 
                         <button
                           type="button"
-                          disabled={disabled}
-                          onClick={() => {
-                            handleToggleWebSearch()
+                          disabled={isModelSwitcherDisabled}
+                          onClick={(event) => {
+                            event.stopPropagation()
                             setIsMobileActionsMenuOpen(false)
+                            if (!isModelSwitcherDisabled) setIsModelMenuOpen(true)
                           }}
-                          className={cn(
-                            'rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50',
-                            isWebSearchActive &&
-                              'border-purple-200 bg-purple-50',
-                          )}
+                          className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <span
-                            className={cn(
-                              'rounded-lg bg-purple-100 p-1.5 text-purple-600',
-                              isWebSearchActive &&
-                                'bg-purple-200 text-purple-700',
-                            )}
-                          >
-                            <HugeiconsIcon icon={Search01Icon} size={24} strokeWidth={1.5} />
+                          <span className="rounded-lg bg-indigo-100 p-1.5 text-indigo-600">
+                            <HugeiconsIcon icon={ArrowDown01Icon} size={24} strokeWidth={1.5} />
                           </span>
-                          <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
-                            Web Search
+                          <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100 truncate max-w-full">
+                            {modelButtonLabel}
                           </span>
                         </button>
 
@@ -1893,6 +1877,96 @@ function ChatComposerComponent({
                           </button>
                         ) : null}
                       </div>
+                    </div>
+                  </>,
+                  document.body,
+                )
+              : null}
+
+            {/* Mobile model picker portal */}
+            {typeof document !== 'undefined' && isModelMenuOpen && !isMobileActionsMenuOpen
+              ? createPortal(
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Close model picker"
+                      className="fixed inset-0 z-[199] bg-black/30"
+                      onClick={() => setIsModelMenuOpen(false)}
+                    />
+                    <div
+                      className="fixed bottom-0 left-0 right-0 z-[200] rounded-t-2xl bg-white shadow-2xl pb-safe dark:bg-neutral-900 animate-in slide-in-from-bottom-10 duration-200"
+                      role="dialog"
+                      aria-label="Select model"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-neutral-300" />
+                      <div className="px-4 pb-2 text-sm font-semibold text-neutral-500">
+                        Model
+                      </div>
+                      {groupedModels.length === 0 && modelsUnavailable ? (
+                        <div className="p-4 text-center text-sm text-primary-500">
+                          <p className="font-medium text-primary-700 mb-1">Gateway not connected</p>
+                          <p className="text-xs">Make sure OpenClaw is running and the gateway URL is configured.</p>
+                        </div>
+                      ) : groupedModels.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-primary-500">
+                          <p className="font-medium text-primary-700 mb-1">No models configured</p>
+                          <p className="text-xs mb-3">Add API keys for providers in your OpenClaw config to unlock more models.</p>
+                          <a href="https://docs.openclaw.ai/configuration" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-accent-500/10 px-3 py-1.5 text-xs font-medium text-accent-600">Setup Guide →</a>
+                        </div>
+                      ) : (
+                        <div className="max-h-[60dvh] overflow-y-auto pb-4">
+                          {(pinnedModels.length > 0 || unavailablePinnedModels.length > 0) && (
+                            <div className="mb-2 border-b border-neutral-100 dark:border-neutral-800 pb-2">
+                              <div className="flex items-center gap-1.5 px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-neutral-400">
+                                <HugeiconsIcon icon={PinIcon} size={13} strokeWidth={1.5} className="text-accent-500" />
+                                <span>Pinned</span>
+                              </div>
+                              {pinnedModels.map((option) => {
+                                const optionActive = isSameModel(option, currentModel)
+                                return (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setIsModelMenuOpen(false); handleModelSelect(option.value) }}
+                                    className={cn('flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors', optionActive ? 'bg-accent-50 text-accent-700 font-medium' : 'text-neutral-700 dark:text-neutral-200')}
+                                    role="option" aria-selected={optionActive}
+                                  >
+                                    <span className="flex-1 truncate">{option.label}</span>
+                                    {optionActive && <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />}
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); togglePin(option.value) }} className="shrink-0 p-1 text-accent-500 hover:bg-accent-50 rounded" aria-label={`Unpin ${option.label}`}>
+                                      <HugeiconsIcon icon={PinIcon} size={13} strokeWidth={2} />
+                                    </button>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                          {unpinnedGroupedModels.map(([provider, models]) => (
+                            <div key={provider}>
+                              <div className="px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-400">{provider}</div>
+                              {models.map((option) => {
+                                const optionActive = isSameModel(option, currentModel)
+                                return (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setIsModelMenuOpen(false); handleModelSelect(option.value) }}
+                                    className={cn('flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors', optionActive ? 'bg-accent-50 text-accent-700 font-medium' : 'text-neutral-700 dark:text-neutral-200')}
+                                    role="option" aria-selected={optionActive}
+                                  >
+                                    <span className="flex-1 truncate">{option.label}</span>
+                                    {optionActive && <span className="size-1.5 rounded-full bg-accent-500 shrink-0" />}
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); togglePin(option.value) }} className="shrink-0 p-1 text-neutral-400 hover:text-accent-500 hover:bg-neutral-100 rounded" aria-label={`Pin ${option.label}`}>
+                                      <HugeiconsIcon icon={PinIcon} size={13} strokeWidth={2} />
+                                    </button>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </>,
                   document.body,
