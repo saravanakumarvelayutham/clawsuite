@@ -3,7 +3,6 @@ import {
   Add01Icon,
   ArrowDown01Icon,
   ArrowUp02Icon,
-  Camera01Icon,
   Cancel01Icon,
   Delete01Icon,
   Mic01Icon,
@@ -1315,6 +1314,7 @@ function ChatComposerComponent({
     ) {
       const files = Array.from(event.target.files ?? [])
       event.target.value = ''
+      setIsMobileActionsMenuOpen(false)
       if (files.length === 0) return
       void addAttachments(files)
     },
@@ -1789,12 +1789,13 @@ function ChatComposerComponent({
                         Actions
                       </div>
                       <div className="grid grid-cols-2 gap-2 px-4 pb-4">
+                        {/* Attach File — keep sheet open so iOS picker can layer on top */}
                         <button
                           type="button"
                           disabled={disabled}
                           onClick={(event) => {
-                            setIsMobileActionsMenuOpen(false)
                             handleOpenAttachmentPicker(event)
+                            // sheet stays open; closes naturally after file selected or on backdrop tap
                           }}
                           className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
@@ -1806,30 +1807,16 @@ function ChatComposerComponent({
                           </span>
                         </button>
 
-                        <button
-                          type="button"
-                          disabled={disabled}
-                          onClick={(event) => {
-                            setIsMobileActionsMenuOpen(false)
-                            handleOpenAttachmentPicker(event)
-                          }}
-                          className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <span className="rounded-lg bg-blue-100 p-1.5 text-blue-600">
-                            <HugeiconsIcon icon={Camera01Icon} size={24} strokeWidth={1.5} />
-                          </span>
-                          <span className="text-sm font-medium text-neutral-800 dark:text-neutral-100">
-                            Camera
-                          </span>
-                        </button>
-
+                        {/* Model selector — opens model picker sheet on top */}
                         <button
                           type="button"
                           disabled={isModelSwitcherDisabled}
                           onClick={(event) => {
                             event.stopPropagation()
-                            setIsMobileActionsMenuOpen(false)
-                            if (!isModelSwitcherDisabled) setIsModelMenuOpen(true)
+                            if (!isModelSwitcherDisabled) {
+                              setIsMobileActionsMenuOpen(false)
+                              setIsModelMenuOpen(true)
+                            }
                           }}
                           className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 flex flex-col items-start gap-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
                         >
@@ -1883,18 +1870,18 @@ function ChatComposerComponent({
                 )
               : null}
 
-            {/* Mobile model picker portal */}
-            {typeof document !== 'undefined' && isModelMenuOpen && !isMobileActionsMenuOpen
+            {/* Mobile model picker portal — z above actions sheet (z-[210]) */}
+            {typeof document !== 'undefined' && isModelMenuOpen
               ? createPortal(
                   <>
                     <button
                       type="button"
                       aria-label="Close model picker"
-                      className="fixed inset-0 z-[199] bg-black/30"
+                      className="fixed inset-0 z-[209] bg-black/30"
                       onClick={() => setIsModelMenuOpen(false)}
                     />
                     <div
-                      className="fixed bottom-0 left-0 right-0 z-[200] rounded-t-2xl bg-white shadow-2xl pb-safe dark:bg-neutral-900 animate-in slide-in-from-bottom-10 duration-200"
+                      className="fixed bottom-0 left-0 right-0 z-[210] rounded-t-2xl bg-white shadow-2xl pb-safe dark:bg-neutral-900 animate-in slide-in-from-bottom-10 duration-200"
                       role="dialog"
                       aria-label="Select model"
                       onClick={(event) => event.stopPropagation()}
