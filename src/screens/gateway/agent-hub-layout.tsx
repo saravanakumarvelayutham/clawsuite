@@ -234,6 +234,9 @@ const HUB_SUBSECTION_TITLE_CLASS = 'text-base font-bold text-neutral-900 dark:te
 const HUB_CARD_LABEL_CLASS = 'text-[10px] font-bold uppercase tracking-widest text-neutral-500 dark:text-slate-400'
 const HUB_PRIMARY_BUTTON_CLASS = 'min-h-11 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-600 sm:px-4 sm:py-2 sm:text-sm'
 const HUB_SECONDARY_BUTTON_CLASS = 'min-h-11 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 sm:px-4 sm:py-2 sm:text-sm'
+const HUB_PAGE_HEADER_CARD_CLASS = 'flex w-full items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)] sm:px-4 sm:py-3'
+const HUB_FILTER_PILL_CLASS = 'flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 transition-colors whitespace-nowrap hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700'
+const HUB_FILTER_PILL_ACTIVE_CLASS = 'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-300'
 
 const WIZARD_STEP_ORDER: WizardStep[] = ['gateway', 'team', 'goal', 'launch']
 
@@ -5248,12 +5251,12 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 
   function renderConfigureContent() {
     return (
-      <div className="relative flex min-h-full flex-col overflow-x-hidden p-4 md:h-full md:min-h-0 md:overflow-y-auto dark:bg-[var(--theme-bg,#0b0e14)]">
+      <div className="relative flex min-h-full flex-col overflow-x-hidden p-3 sm:p-4 md:h-full md:min-h-0 md:overflow-y-auto dark:bg-[var(--theme-bg,#0b0e14)]">
         <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-slate-900/60 dark:to-[var(--theme-bg,#0b0e14)]" />
-        <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-4">
+        <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-3 sm:gap-4">
 
         {/* ── Header + contextual action ── */}
-          <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-4 py-3 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
+          <div className={HUB_PAGE_HEADER_CARD_CLASS}>
             <div>
               <h2 className={HUB_PAGE_TITLE_CLASS}>Configure</h2>
               <p className="text-xs text-neutral-500 dark:text-slate-400">Configure agents, teams, API keys, and approvals</p>
@@ -5299,10 +5302,10 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                   type="button"
                   onClick={() => setConfigSection(section.id)}
                   className={cn(
-                    'flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors whitespace-nowrap',
+                    HUB_FILTER_PILL_CLASS,
                     isActive
-                      ? 'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-300'
-                      : 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700',
+                      ? HUB_FILTER_PILL_ACTIVE_CLASS
+                      : '',
                   )}
                 >
                   <span aria-hidden>{section.icon}</span>
@@ -6181,7 +6184,7 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
 	        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-neutral-100/60 to-white dark:from-neutral-800/20 dark:to-neutral-950" />
 	        <div className="relative mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col gap-3 p-3 pb-24 sm:gap-4 sm:p-4 sm:pb-4">
 	          {/* ── Header ──────────────────────────────────────────────────── */}
-          <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50/95 px-3 py-2 shadow-sm dark:border-neutral-800 dark:bg-[var(--theme-panel)]">
+          <div className={HUB_PAGE_HEADER_CARD_CLASS}>
             <div>
               {/* Mobile: short label; Desktop: full title + description */}
               <h2 className={HUB_PAGE_TITLE_CLASS}>
@@ -6201,22 +6204,6 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
             </div>
           </div>
 
-          {/* ── Compaction Banner ──────────────────────────────────────── */}
-          {compactionBanner && (
-            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300">
-              <span className="animate-spin">⚙️</span>
-              <span>{compactionBanner}</span>
-              <button
-                type="button"
-                onClick={() => setCompactionBanner(null)}
-                className="ml-auto text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-200"
-                aria-label="Dismiss"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
           {/* ── Filter Bar — scrollable on mobile, full flex on desktop ── */}
           <div className="relative w-full overflow-hidden">
             <div className="flex w-full items-center gap-2 overflow-x-auto pr-3 scrollbar-none">
@@ -6228,10 +6215,11 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
                     type="button"
                     onClick={() => setMissionSubTab(tab.id)}
                     className={cn(
-                      'min-h-11 shrink-0 rounded-lg px-3 py-2 text-sm font-semibold flex items-center gap-1.5 whitespace-nowrap transition-colors',
+                      HUB_FILTER_PILL_CLASS,
+                      'gap-1.5',
                       isActive
-                        ? 'border border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-300'
-                        : 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700',
+                        ? HUB_FILTER_PILL_ACTIVE_CLASS
+                        : '',
                     )}
                   >
                     <span className="whitespace-nowrap">{tab.label}</span>
@@ -6256,6 +6244,22 @@ export function AgentHubLayout({ agents }: AgentHubLayoutProps) {
               className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-neutral-900"
             />
           </div>
+
+          {/* ── Compaction Banner ──────────────────────────────────────── */}
+          {compactionBanner && (
+            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-300">
+              <span className="animate-spin">⚙️</span>
+              <span>{compactionBanner}</span>
+              <button
+                type="button"
+                onClick={() => setCompactionBanner(null)}
+                className="ml-auto text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-200"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* ── Mission List ────────────────────────────────────────────── */}
           <div className="min-h-0 flex-1 overflow-auto">

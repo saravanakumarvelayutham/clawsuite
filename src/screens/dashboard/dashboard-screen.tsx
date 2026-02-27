@@ -601,7 +601,7 @@ export function DashboardScreen() {
     <>
       <main
         ref={mainScrollRef as RefObject<HTMLElement>}
-        className="min-h-full overflow-x-hidden px-4 pt-3 pb-24 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 dark:text-neutral-100 md:h-full md:overflow-y-auto md:bg-surface md:px-6 md:pt-8 md:pb-8"
+        className="min-h-full overflow-x-hidden px-3 pt-3 pb-24 pb-[calc(env(safe-area-inset-bottom)+6rem)] text-primary-900 dark:text-neutral-100 sm:px-4 sm:pb-6 md:h-full md:overflow-y-auto md:bg-surface md:px-6 md:pt-8 md:pb-8"
       >
         {/* Pull-to-refresh indicator (mobile) */}
         {isMobile && isPulling ? (
@@ -774,13 +774,13 @@ export function DashboardScreen() {
                     <span
                       key={chip.id}
                       className={cn(
-                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
+                        'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
                         chip.severity === 'red'
                           ? 'border-red-200 bg-red-100/75 text-red-700'
                           : 'border-amber-200 bg-amber-100/75 text-amber-700',
                       )}
                     >
-                      {chip.text}
+                      <span className="truncate">{chip.text}</span>
                       {chip.dismissable !== false && (
                         <button
                           type="button"
